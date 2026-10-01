@@ -1,69 +1,81 @@
 package br.financeiro.Service;
 
-import br.financeiro.DTO.ItemFinanceiroDTO;
+import br.financeiro.DTO.request.ItemFinanceiroRequestDTO;
+import br.financeiro.DTO.response.ItemFinanceiroResponseDTO;
+import br.financeiro.model.Empresa;
 import br.financeiro.model.ItemFinanceiro;
+import br.financeiro.repository.EmpresaRepository;
 import br.financeiro.repository.ItemFinanceiroRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
-import java.util.stream.Collectors;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ItemFinanceiroService {
 
-    @Autowired
-    private ItemFinanceiroRepository repository;
+    private final ItemFinanceiroRepository itemFinanceiroRepository;
+    private final EmpresaRepository empresaRepository;
 
-    public List<ItemFinanceiroDTO> listarTodos() {
-        return repository.findAll()
-                .stream()
-                .map(this::paraDTO)
-                .collect(Collectors.toList());
+    public ItemFinanceiroService(ItemFinanceiroRepository itemFinanceiroRepository,
+                                 EmpresaRepository empresaRepository) {
+        this.itemFinanceiroRepository = itemFinanceiroRepository;
+        this.empresaRepository = empresaRepository;
     }
 
-    public ItemFinanceiroDTO buscarPorId(Integer id) {
-        ItemFinanceiro entity = repository.findById(id.longValue())
-                .orElseThrow(() -> new RuntimeException("Item Financeiro não encontrado com ID: " + id));
-        return paraDTO(entity);
+    @Transactional(readOnly = true)
+    public Page<ItemFinanceiroResponseDTO> listarTodos(Pageable pageable) {
+        return itemFinanceiroRepository.findAll(pageable)
+                .map(ItemFinanceiroResponseDTO::fromEntity);
     }
 
-    public ItemFinanceiroDTO salvar(ItemFinanceiroDTO dto) {
-        ItemFinanceiro entity = paraEntidade(dto);
-        ItemFinanceiro salva = repository.save(entity);
-        return paraDTO(salva);
+    @Transactional(readOnly = true)
+    public ItemFinanceiroResponseDTO buscarPorId(Long id) {
+        ItemFinanceiro item = itemFinanceiroRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Item financeiro não encontrado com o ID: " + id));
+        return ItemFinanceiroResponseDTO.fromEntity(item);
     }
 
-    public ItemFinanceiroDTO atualizar(Integer id, ItemFinanceiroDTO dto) {
-        repository.findById(id.longValue())
-                .orElseThrow(() -> new RuntimeException("Item Financeiro não encontrado com ID: " + id));
+    @Transactional
+    public ItemFinanceiroResponseDTO salvar(ItemFinanceiroRequestDTO dto) {
+        Empresa empresa = empresaRepository.findById(dto.empresaId())
+                .orElseThrow(() -> new RuntimeException("Empresa não encontrada com o ID: " + dto.empresaId()));
 
-        dto.setId(id);
-        ItemFinanceiro entity = paraEntidade(dto);
-        ItemFinanceiro atualizada = repository.save(entity);
-        return paraDTO(atualizada);
-    }
-
-    public void deletar(Integer id) {
-        if (!repository.existsById(id.longValue())) {
-            throw new RuntimeException("Item Financeiro não encontrado com ID: " + id);
-        }
-        repository.deleteById(id.longValue());
-    }
-
-    private ItemFinanceiroDTO paraDTO(ItemFinanceiro entity) {
-        ItemFinanceiroDTO dto = new ItemFinanceiroDTO();
-        if (entity.getId() != null) {
-            dto.setId(entity.getId().intValue());
-        }
-        return dto;
-    }
-
-    private ItemFinanceiro paraEntidade(ItemFinanceiroDTO dto) {
         ItemFinanceiro entity = new ItemFinanceiro();
-        if (dto.getId() != null) {
-            entity.setId(dto.getId().longValue());
+        preencherEntidade(entity, dto, empresa);
+
+        ItemFinanceiro salvo = itemFinanceiroRepository.save(entity);
+        return ItemFinanceiroResponseDTO.fromEntity(salvo);
+    }
+
+    @Transactional
+    public ItemFinanceiroResponseDTO atualizar(Long id, ItemFinanceiroRequestDTO dto) {
+        ItemFinanceiro entity = itemFinanceiroRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Item financeiro não encontrado com o ID: " + id));
+
+        Empresa empresa = empresaRepository.findById(dto.empresaId())
+                .orElseThrow(() -> new RuntimeException("Empresa não encontrada com o ID: " + dto.empresaId()));
+
+        preencherEntidade(entity, dto, empresa);
+
+        ItemFinanceiro atualizado = itemFinanceiroRepository.save(entity);
+        return ItemFinanceiroResponseDTO.fromEntity(atualizado);
+    }
+
+    @Transactional
+    public void deletar(Long id) {
+        if (!itemFinanceiroRepository.existsById(id)) {
+            throw new RuntimeException("Item financeiro não encontrado com o ID: " + id);
         }
-        return entity;
+        itemFinanceiroRepository.deleteById(id);
+    }
+
+    private void preencherEntidade(ItemFinanceiro entity, ItemFinanceiroRequestDTO dto, Empresa empresa) {
+        entity.setEmpresa(empresa);
+        entity.setDescricao(dto.descricao());
+        entity.setCategoria(dto.categoria());
+        entity.setValor(dto.valor());
+        entity.setStatus(dto.status());
+        entity.setDataVencimento(dto.dataVencimento());
     }
 }
