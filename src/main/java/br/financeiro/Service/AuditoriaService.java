@@ -1,48 +1,88 @@
-package br.financeiro.Service;
+package br.financeiro.service;
 
-import br.financeiro.DTO.AuditoriaDTO;
+import br.financeiro.DTO.request.AuditoriaRequestDTO;
+import br.financeiro.DTO.response.AuditoriaResponseDTO;
 import br.financeiro.model.Auditoria;
+import br.financeiro.model.Empresa;
+import br.financeiro.model.Usuario;
 import br.financeiro.repository.AuditoriaRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import br.financeiro.repository.EmpresaRepository;
+import br.financeiro.repository.UsuarioRepository;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class AuditoriaService {
 
-    @Autowired
-    private AuditoriaRepository repository;
+    private final AuditoriaRepository auditoriaRepository;
+    private final EmpresaRepository empresaRepository;
+    private final UsuarioRepository usuarioRepository;
 
-    public List<AuditoriaDTO> listarAuditorias() {
-        return repository.findAll()
-                .stream()
-                .map(this::paraDTO)
-                .collect(Collectors.toList());
+    public AuditoriaService(AuditoriaRepository auditoriaRepository,
+                            EmpresaRepository empresaRepository,
+                            UsuarioRepository usuarioRepository) {
+        this.auditoriaRepository = auditoriaRepository;
+        this.empresaRepository = empresaRepository;
+        this.usuarioRepository = usuarioRepository;
     }
 
-    public AuditoriaDTO buscarAuditoriaPorId(Long id) {
-        Auditoria entity = repository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Auditoria não encontrada com ID: " + id));
-        return paraDTO(entity);
+    @Transactional(readOnly = true)
+    public List<AuditoriaResponseDTO> listarTodas() {
+        return auditoriaRepository.findAll().stream()
+                .map(AuditoriaResponseDTO::fromEntity)
+                .toList();
     }
 
-    public AuditoriaDTO salvarAuditoria(AuditoriaDTO dto) {
-        Auditoria entity = paraEntidade(dto);
-        Auditoria salva = repository.save(entity);
-        return paraDTO(salva);
+    @Transactional(readOnly = true)
+    public AuditoriaResponseDTO buscarPorId(Long id) {
+        Auditoria auditoria = auditoriaRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Auditoria não encontrada com id: " + id));
+        return AuditoriaResponseDTO.fromEntity(auditoria);
     }
 
-    private AuditoriaDTO paraDTO(Auditoria entity) {
-        AuditoriaDTO dto = new AuditoriaDTO();
-        dto.setId(entity.getId());
-        return dto;
+    @Transactional
+    public AuditoriaResponseDTO criar(AuditoriaRequestDTO dto) {
+        Auditoria auditoria = new Auditoria();
+        mapearDtoParaEntidade(dto, auditoria);
+        Auditoria salva = auditoriaRepository.save(auditoria);
+        return AuditoriaResponseDTO.fromEntity(salva);
     }
 
-    private Auditoria paraEntidade(AuditoriaDTO dto) {
-        Auditoria entity = new Auditoria();
-        entity.setId(dto.getId());
-        return entity;
+    @Transactional
+    public AuditoriaResponseDTO atualizar(Long id, AuditoriaRequestDTO dto) {
+        Auditoria auditoria = auditoriaRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Auditoria não encontrada com id: " + id));
+        mapearDtoParaEntidade(dto, auditoria);
+        Auditoria atualizada = auditoriaRepository.save(auditoria);
+        return AuditoriaResponseDTO.fromEntity(atualizada);
+    }
+
+    @Transactional
+    public void deletar(Long id) {
+        if (!auditoriaRepository.existsById(id)) {
+            throw new EntityNotFoundException("Auditoria não encontrada com id: " + id);
+        }
+        auditoriaRepository.deleteById(id);
+    }
+
+    private void mapearDtoParaEntidade(AuditoriaRequestDTO dto, Auditoria auditoria) {
+        if (dto.empresaId() != null) {
+            Empresa empresa = empresaRepository.findById(dto.empresaId())
+                    .orElseThrow(() -> new EntityNotFoundException("Empresa não encontrada com id: " + dto.empresaId()));
+            auditoria.setEmpresa(empresa);
+        }
+
+        if (dto.responsavelId() != null) {
+            Usuario responsavel = usuarioRepository.findById(dto.responsavelId())
+                    .orElseThrow(() -> new EntityNotFoundException("Responsável não encontrado com id: " + dto.responsavelId()));
+            auditoria.setResponsavel(responsavel);
+        }
+
+        auditoria.setDataProgramada(dto.dataProgramada());
+        auditoria.setEscopo(dto.escopo());
+        auditoria.setStatus(dto.status());
     }
 }

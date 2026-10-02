@@ -1,44 +1,49 @@
-package br.financeiro.Controller;
+package br.financeiro.controller;
 
-import br.financeiro.DTO.FaturamentoMensalDTO;
-import br.financeiro.Service.FaturamentoMensalService;
-import org.springframework.beans.factory.annotation.Autowired;
+import br.financeiro.DTO.request.FaturamentoMensalRequestDTO;
+import br.financeiro.DTO.response.FaturamentoMensalResponseDTO;
+import br.financeiro.service.FaturamentoMensalService;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("/faturamentos-mensais")
-@CrossOrigin("*")
+@RequestMapping("/api/faturamentos-mensais")
 public class FaturamentoMensalController {
 
-    @Autowired
-    private FaturamentoMensalService service;
+    private final FaturamentoMensalService faturamentoMensalService;
+
+    public FaturamentoMensalController(FaturamentoMensalService faturamentoMensalService) {
+        this.faturamentoMensalService = faturamentoMensalService;
+    }
 
     @GetMapping
-    public ResponseEntity<List<FaturamentoMensalDTO>> listarTodos() {
-        return ResponseEntity.ok(service.listarTodos());
+    public ResponseEntity<List<FaturamentoMensalResponseDTO>> listarTodos() {
+        return ResponseEntity.ok(faturamentoMensalService.listarTodos());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<FaturamentoMensalDTO> buscarPorId(@PathVariable Integer id) {
-        return ResponseEntity.ok(service.buscarPorId(id));
+    public ResponseEntity<FaturamentoMensalResponseDTO> buscarPorId(@PathVariable Long id) {
+        return ResponseEntity.ok(faturamentoMensalService.buscarPorId(id));
     }
 
     @PostMapping
-    public ResponseEntity<FaturamentoMensalDTO> criar(@RequestBody FaturamentoMensalDTO dto) {
-        return ResponseEntity.ok(service.salvar(dto));
+    public ResponseEntity<FaturamentoMensalResponseDTO> criar(@Valid @RequestBody FaturamentoMensalRequestDTO requestDTO) {
+        FaturamentoMensalResponseDTO criado = faturamentoMensalService.criar(requestDTO);
+        return ResponseEntity.status(HttpStatus.CREATED).body(criado);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<FaturamentoMensalDTO> atualizar(@PathVariable Integer id, @RequestBody FaturamentoMensalDTO dto) {
-        return ResponseEntity.ok(service.atualizar(id, dto));
+    public ResponseEntity<FaturamentoMensalResponseDTO> atualizar(@PathVariable Long id, @Valid @RequestBody FaturamentoMensalRequestDTO requestDTO) {
+        return ResponseEntity.ok(faturamentoMensalService.atualizar(id, requestDTO));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deletar(@PathVariable Integer id) {
-        service.deletar(id);
+    public ResponseEntity<Void> deletar(@PathVariable Long id) {
+        faturamentoMensalService.deletar(id);
         return ResponseEntity.noContent().build();
     }
 }

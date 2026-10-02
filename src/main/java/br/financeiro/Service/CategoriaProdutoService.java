@@ -1,69 +1,74 @@
-package br.financeiro.Service;
+package br.financeiro.service;
 
-import br.financeiro.DTO.CategoriaProdutoDTO;
+import br.financeiro.DTO.request.CategoriaProdutoRequestDTO;
+import br.financeiro.DTO.response.CategoriaProdutoResponseDTO;
 import br.financeiro.model.CategoriaProduto;
+import br.financeiro.model.Empresa;
 import br.financeiro.repository.CategoriaProdutoRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import br.financeiro.repository.EmpresaRepository;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class CategoriaProdutoService {
 
-    @Autowired
-    private CategoriaProdutoRepository repository;
+    private final CategoriaProdutoRepository categoriaProdutoRepository;
+    private final EmpresaRepository empresaRepository;
 
-    public List<CategoriaProdutoDTO> listarTodas() {
-        return repository.findAll()
-                .stream()
-                .map(this::paraDTO)
-                .collect(Collectors.toList());
+    public CategoriaProdutoService(CategoriaProdutoRepository categoriaProdutoRepository,
+                                   EmpresaRepository empresaRepository) {
+        this.categoriaProdutoRepository = categoriaProdutoRepository;
+        this.empresaRepository = empresaRepository;
     }
 
-    public CategoriaProdutoDTO buscarPorId(Integer id) {
-        CategoriaProduto entity = repository.findById(id.longValue())
-                .orElseThrow(() -> new RuntimeException("Categoria não encontrada com ID: " + id));
-        return paraDTO(entity);
+    @Transactional(readOnly = true)
+    public List<CategoriaProdutoResponseDTO> listarTodas() {
+        return categoriaProdutoRepository.findAll().stream()
+                .map(CategoriaProdutoResponseDTO::fromEntity)
+                .toList();
     }
 
-    public CategoriaProdutoDTO salvar(CategoriaProdutoDTO dto) {
-        CategoriaProduto entity = paraEntidade(dto);
-        CategoriaProduto salva = repository.save(entity);
-        return paraDTO(salva);
+    @Transactional(readOnly = true)
+    public CategoriaProdutoResponseDTO buscarPorId(Long id) {
+        CategoriaProduto categoria = categoriaProdutoRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Categoria de produto não encontrada com id: " + id));
+        return CategoriaProdutoResponseDTO.fromEntity(categoria);
     }
 
-    public CategoriaProdutoDTO atualizar(Integer id, CategoriaProdutoDTO dto) {
-        repository.findById(id.longValue())
-                .orElseThrow(() -> new RuntimeException("Categoria não encontrada com ID: " + id));
-
-        dto.setId(id);
-        CategoriaProduto entity = paraEntidade(dto);
-        CategoriaProduto atualizada = repository.save(entity);
-        return paraDTO(atualizada);
+    @Transactional
+    public CategoriaProdutoResponseDTO criar(CategoriaProdutoRequestDTO dto) {
+        CategoriaProduto categoria = new CategoriaProduto();
+        mapearDtoParaEntidade(dto, categoria);
+        CategoriaProduto salva = categoriaProdutoRepository.save(categoria);
+        return CategoriaProdutoResponseDTO.fromEntity(salva);
     }
 
-    public void deletar(Integer id) {
-        if (!repository.existsById(id.longValue())) {
-            throw new RuntimeException("Categoria não encontrada com ID: " + id);
+    @Transactional
+    public CategoriaProdutoResponseDTO atualizar(Long id, CategoriaProdutoRequestDTO dto) {
+        CategoriaProduto categoria = categoriaProdutoRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Categoria de produto não encontrada com id: " + id));
+        mapearDtoParaEntidade(dto, categoria);
+        CategoriaProduto atualizada = categoriaProdutoRepository.save(categoria);
+        return CategoriaProdutoResponseDTO.fromEntity(atualizada);
+    }
+
+    @Transactional
+    public void deletar(Long id) {
+        if (!categoriaProdutoRepository.existsById(id)) {
+            throw new EntityNotFoundException("Categoria de produto não encontrada com id: " + id);
         }
-        repository.deleteById(id.longValue());
+        categoriaProdutoRepository.deleteById(id);
     }
 
-    private CategoriaProdutoDTO paraDTO(CategoriaProduto entity) {
-        CategoriaProdutoDTO dto = new CategoriaProdutoDTO();
-        if (entity.getId() != null) {
-            dto.setId(entity.getId().intValue());
+    private void mapearDtoParaEntidade(CategoriaProdutoRequestDTO dto, CategoriaProduto categoria) {
+        if (dto.empresaId() != null) {
+            Empresa empresa = empresaRepository.findById(dto.empresaId())
+                    .orElseThrow(() -> new EntityNotFoundException("Empresa não encontrada com id: " + dto.empresaId()));
+            categoria.setEmpresa(empresa);
         }
-        return dto;
-    }
-
-    private CategoriaProduto paraEntidade(CategoriaProdutoDTO dto) {
-        CategoriaProduto entity = new CategoriaProduto();
-        if (dto.getId() != null) {
-            entity.setId(dto.getId().longValue());
-        }
-        return entity;
+        categoria.setNome(dto.nome());
     }
 }

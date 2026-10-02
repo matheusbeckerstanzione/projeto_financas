@@ -1,39 +1,56 @@
-package br.financeiro.Controller;
+package br.financeiro.controller;
 
-import br.financeiro.DTO.FuncionarioBeneficioDTO;
-import br.financeiro.Service.FuncionarioBeneficioService;
-import org.springframework.beans.factory.annotation.Autowired;
+import br.financeiro.DTO.request.FuncionarioBeneficioRequestDTO;
+import br.financeiro.DTO.response.FuncionarioBeneficioResponseDTO;
+import br.financeiro.service.FuncionarioBeneficioService;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("/funcionario-beneficios")
-@CrossOrigin("*")
+@RequestMapping("/api/funcionarios-beneficios")
 public class FuncionarioBeneficioController {
 
-    @Autowired
-    private FuncionarioBeneficioService service;
+    private final FuncionarioBeneficioService funcionarioBeneficioService;
+
+    public FuncionarioBeneficioController(FuncionarioBeneficioService funcionarioBeneficioService) {
+        this.funcionarioBeneficioService = funcionarioBeneficioService;
+    }
 
     @GetMapping
-    public ResponseEntity<List<FuncionarioBeneficioDTO>> listarTodos() {
-        return ResponseEntity.ok(service.listarTodos());
+    public ResponseEntity<List<FuncionarioBeneficioResponseDTO>> listarTodos() {
+        return ResponseEntity.ok(funcionarioBeneficioService.listarTodos());
     }
 
     @GetMapping("/{funcionarioId}/{beneficioId}")
-    public ResponseEntity<FuncionarioBeneficioDTO> buscarPorIds(@PathVariable Integer funcionarioId, @PathVariable Integer beneficioId) {
-        return ResponseEntity.ok(service.buscarPorIds(funcionarioId, beneficioId));
+    public ResponseEntity<FuncionarioBeneficioResponseDTO> buscarPorId(
+            @PathVariable Long funcionarioId,
+            @PathVariable Long beneficioId) {
+        return ResponseEntity.ok(funcionarioBeneficioService.buscarPorId(funcionarioId, beneficioId));
     }
 
     @PostMapping
-    public ResponseEntity<FuncionarioBeneficioDTO> criar(@RequestBody FuncionarioBeneficioDTO dto) {
-        return ResponseEntity.ok(service.salvar(dto));
+    public ResponseEntity<FuncionarioBeneficioResponseDTO> criar(@Valid @RequestBody FuncionarioBeneficioRequestDTO requestDTO) {
+        FuncionarioBeneficioResponseDTO criado = funcionarioBeneficioService.criar(requestDTO);
+        return ResponseEntity.status(HttpStatus.CREATED).body(criado);
+    }
+
+    @PutMapping("/{funcionarioId}/{beneficioId}")
+    public ResponseEntity<FuncionarioBeneficioResponseDTO> atualizar(
+            @PathVariable Long funcionarioId,
+            @PathVariable Long beneficioId,
+            @Valid @RequestBody FuncionarioBeneficioRequestDTO requestDTO) {
+        return ResponseEntity.ok(funcionarioBeneficioService.atualizar(funcionarioId, beneficioId, requestDTO));
     }
 
     @DeleteMapping("/{funcionarioId}/{beneficioId}")
-    public ResponseEntity<Void> deletar(@PathVariable Integer funcionarioId, @PathVariable Integer beneficioId) {
-        service.deletar(funcionarioId, beneficioId);
+    public ResponseEntity<Void> deletar(
+            @PathVariable Long funcionarioId,
+            @PathVariable Long beneficioId) {
+        funcionarioBeneficioService.deletar(funcionarioId, beneficioId);
         return ResponseEntity.noContent().build();
     }
 }

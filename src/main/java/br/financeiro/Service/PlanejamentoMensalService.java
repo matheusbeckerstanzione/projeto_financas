@@ -1,69 +1,77 @@
-package br.financeiro.Service;
+package br.financeiro.service;
 
-import br.financeiro.DTO.PlanejamentoMensalDTO;
+import br.financeiro.DTO.request.PlanejamentoMensalRequestDTO;
+import br.financeiro.DTO.response.PlanejamentoMensalResponseDTO;
+import br.financeiro.model.Empresa;
 import br.financeiro.model.PlanejamentoMensal;
+import br.financeiro.repository.EmpresaRepository;
 import br.financeiro.repository.PlanejamentoMensalRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class PlanejamentoMensalService {
 
-    @Autowired
-    private PlanejamentoMensalRepository repository;
+    private final PlanejamentoMensalRepository planejamentoMensalRepository;
+    private final EmpresaRepository empresaRepository;
 
-    public List<PlanejamentoMensalDTO> listarTodos() {
-        return repository.findAll()
-                .stream()
-                .map(this::paraDTO)
-                .collect(Collectors.toList());
+    public PlanejamentoMensalService(PlanejamentoMensalRepository planejamentoMensalRepository,
+                                    EmpresaRepository empresaRepository) {
+        this.planejamentoMensalRepository = planejamentoMensalRepository;
+        this.empresaRepository = empresaRepository;
     }
 
-    public PlanejamentoMensalDTO buscarPorId(Integer id) {
-        PlanejamentoMensal entity = repository.findById(id.longValue())
-                .orElseThrow(() -> new RuntimeException("Planejamento Mensal não encontrado com ID: " + id));
-        return paraDTO(entity);
+    @Transactional(readOnly = true)
+    public List<PlanejamentoMensalResponseDTO> listarTodos() {
+        return planejamentoMensalRepository.findAll().stream()
+                .map(PlanejamentoMensalResponseDTO::fromEntity)
+                .toList();
     }
 
-    public PlanejamentoMensalDTO salvar(PlanejamentoMensalDTO dto) {
-        PlanejamentoMensal entity = paraEntidade(dto);
-        PlanejamentoMensal salva = repository.save(entity);
-        return paraDTO(salva);
+    @Transactional(readOnly = true)
+    public PlanejamentoMensalResponseDTO buscarPorId(Long id) {
+        PlanejamentoMensal planejamento = planejamentoMensalRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Planejamento mensal não encontrado com id: " + id));
+        return PlanejamentoMensalResponseDTO.fromEntity(planejamento);
     }
 
-    public PlanejamentoMensalDTO atualizar(Integer id, PlanejamentoMensalDTO dto) {
-        repository.findById(id.longValue())
-                .orElseThrow(() -> new RuntimeException("Planejamento Mensal não encontrado com ID: " + id));
-
-        dto.setId(id);
-        PlanejamentoMensal entity = paraEntidade(dto);
-        PlanejamentoMensal atualizada = repository.save(entity);
-        return paraDTO(atualizada);
+    @Transactional
+    public PlanejamentoMensalResponseDTO criar(PlanejamentoMensalRequestDTO dto) {
+        PlanejamentoMensal planejamento = new PlanejamentoMensal();
+        mapearDtoParaEntidade(dto, planejamento);
+        PlanejamentoMensal salvo = planejamentoMensalRepository.save(planejamento);
+        return PlanejamentoMensalResponseDTO.fromEntity(salvo);
     }
 
-    public void deletar(Integer id) {
-        if (!repository.existsById(id.longValue())) {
-            throw new RuntimeException("Planejamento Mensal não encontrado com ID: " + id);
+    @Transactional
+    public PlanejamentoMensalResponseDTO atualizar(Long id, PlanejamentoMensalRequestDTO dto) {
+        PlanejamentoMensal planejamento = planejamentoMensalRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Planejamento mensal não encontrado com id: " + id));
+        mapearDtoParaEntidade(dto, planejamento);
+        PlanejamentoMensal atualizado = planejamentoMensalRepository.save(planejamento);
+        return PlanejamentoMensalResponseDTO.fromEntity(atualizado);
+    }
+
+    @Transactional
+    public void deletar(Long id) {
+        if (!planejamentoMensalRepository.existsById(id)) {
+            throw new EntityNotFoundException("Planejamento mensal não encontrado com id: " + id);
         }
-        repository.deleteById(id.longValue());
+        planejamentoMensalRepository.deleteById(id);
     }
 
-    private PlanejamentoMensalDTO paraDTO(PlanejamentoMensal entity) {
-        PlanejamentoMensalDTO dto = new PlanejamentoMensalDTO();
-        if (entity.getId() != null) {
-            dto.setId(entity.getId().intValue());
+    private void mapearDtoParaEntidade(PlanejamentoMensalRequestDTO dto, PlanejamentoMensal planejamento) {
+        if (dto.empresaId() != null) {
+            Empresa empresa = empresaRepository.findById(dto.empresaId())
+                    .orElseThrow(() -> new EntityNotFoundException("Empresa não encontrada com id: " + dto.empresaId()));
+            planejamento.setEmpresa(empresa);
         }
-        return dto;
-    }
 
-    private PlanejamentoMensal paraEntidade(PlanejamentoMensalDTO dto) {
-        PlanejamentoMensal entity = new PlanejamentoMensal();
-        if (dto.getId() != null) {
-            entity.setId(dto.getId().longValue());
-        }
-        return entity;
+        planejamento.setTitulo(dto.titulo());
+        planejamento.setData(dto.data());
+        planejamento.setDescricao(dto.descricao());
     }
 }

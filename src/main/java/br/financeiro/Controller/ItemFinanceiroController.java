@@ -1,58 +1,49 @@
-package br.financeiro.Controller;
+package br.financeiro.controller;
 
 import br.financeiro.DTO.request.ItemFinanceiroRequestDTO;
 import br.financeiro.DTO.response.ItemFinanceiroResponseDTO;
-import br.financeiro.Service.ItemFinanceiroService;
+import br.financeiro.service.ItemFinanceiroService;
 import jakarta.validation.Valid;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
-import java.net.URI;
+import java.util.List;
 
 @RestController
-@RequestMapping("/itens-financeiros")
-@CrossOrigin("*")
+@RequestMapping("/api/itens-financeiros")
 public class ItemFinanceiroController {
 
-    private final ItemFinanceiroService service;
+    private final ItemFinanceiroService itemFinanceiroService;
 
-    public ItemFinanceiroController(ItemFinanceiroService service) {
-        this.service = service;
+    public ItemFinanceiroController(ItemFinanceiroService itemFinanceiroService) {
+        this.itemFinanceiroService = itemFinanceiroService;
     }
 
     @GetMapping
-    public ResponseEntity<Page<ItemFinanceiroResponseDTO>> listarTodos(Pageable pageable) {
-        return ResponseEntity.ok(service.listarTodos(pageable));
+    public ResponseEntity<List<ItemFinanceiroResponseDTO>> listarTodos() {
+        return ResponseEntity.ok(itemFinanceiroService.listarTodos());
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<ItemFinanceiroResponseDTO> buscarPorId(@PathVariable Long id) {
-        return ResponseEntity.ok(service.buscarPorId(id));
+        return ResponseEntity.ok(itemFinanceiroService.buscarPorId(id));
     }
 
     @PostMapping
-    public ResponseEntity<ItemFinanceiroResponseDTO> criar(@RequestBody @Valid ItemFinanceiroRequestDTO dto) {
-        ItemFinanceiroResponseDTO response = service.salvar(dto);
-        URI location = ServletUriComponentsBuilder.fromCurrentRequest()
-                .path("/{id}")
-                .buildAndExpand(response.id())
-                .toUri();
-        return ResponseEntity.created(location).body(response);
+    public ResponseEntity<ItemFinanceiroResponseDTO> criar(@Valid @RequestBody ItemFinanceiroRequestDTO requestDTO) {
+        ItemFinanceiroResponseDTO criado = itemFinanceiroService.criar(requestDTO);
+        return ResponseEntity.status(HttpStatus.CREATED).body(criado);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ItemFinanceiroResponseDTO> atualizar(
-            @PathVariable Long id,
-            @RequestBody @Valid ItemFinanceiroRequestDTO dto) {
-        return ResponseEntity.ok(service.atualizar(id, dto));
+    public ResponseEntity<ItemFinanceiroResponseDTO> atualizar(@PathVariable Long id, @Valid @RequestBody ItemFinanceiroRequestDTO requestDTO) {
+        return ResponseEntity.ok(itemFinanceiroService.atualizar(id, requestDTO));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
-        service.deletar(id);
+        itemFinanceiroService.deletar(id);
         return ResponseEntity.noContent().build();
     }
 }

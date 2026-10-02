@@ -1,50 +1,49 @@
-package br.financeiro.Controller;
+package br.financeiro.controller;
 
-import br.financeiro.DTO.ImpostoDTO;
-import br.financeiro.DTO.ImpostoResumoDTO;
-import br.financeiro.Service.ImpostoService;
-import org.springframework.beans.factory.annotation.Autowired;
+import br.financeiro.DTO.request.ImpostoRequestDTO;
+import br.financeiro.DTO.response.ImpostoResponseDTO;
+import br.financeiro.service.ImpostoService;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("/impostos")
-@CrossOrigin("*")
+@RequestMapping("/api/impostos")
 public class ImpostoController {
 
-    @Autowired
-    private ImpostoService service;
+    private final ImpostoService impostoService;
+
+    public ImpostoController(ImpostoService impostoService) {
+        this.impostoService = impostoService;
+    }
 
     @GetMapping
-    public ResponseEntity<List<ImpostoDTO>> listarTodos() {
-        return ResponseEntity.ok(service.listarTodos());
+    public ResponseEntity<List<ImpostoResponseDTO>> listarTodos() {
+        return ResponseEntity.ok(impostoService.listarTodos());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ImpostoDTO> buscarPorId(@PathVariable Integer id) {
-        return ResponseEntity.ok(service.buscarPorId(id));
-    }
-
-    @GetMapping("/resumo")
-    public ResponseEntity<ImpostoResumoDTO> obterResumo() {
-        return ResponseEntity.ok(service.obterResumoImpostos());
+    public ResponseEntity<ImpostoResponseDTO> buscarPorId(@PathVariable Long id) {
+        return ResponseEntity.ok(impostoService.buscarPorId(id));
     }
 
     @PostMapping
-    public ResponseEntity<ImpostoDTO> criar(@RequestBody ImpostoDTO dto) {
-        return ResponseEntity.ok(service.salvar(dto));
+    public ResponseEntity<ImpostoResponseDTO> criar(@Valid @RequestBody ImpostoRequestDTO requestDTO) {
+        ImpostoResponseDTO criado = impostoService.criar(requestDTO);
+        return ResponseEntity.status(HttpStatus.CREATED).body(criado);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ImpostoDTO> atualizar(@PathVariable Integer id, @RequestBody ImpostoDTO dto) {
-        return ResponseEntity.ok(service.atualizar(id, dto));
+    public ResponseEntity<ImpostoResponseDTO> atualizar(@PathVariable Long id, @Valid @RequestBody ImpostoRequestDTO requestDTO) {
+        return ResponseEntity.ok(impostoService.atualizar(id, requestDTO));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deletar(@PathVariable Integer id) {
-        service.deletar(id);
+    public ResponseEntity<Void> deletar(@PathVariable Long id) {
+        impostoService.deletar(id);
         return ResponseEntity.noContent().build();
     }
 }

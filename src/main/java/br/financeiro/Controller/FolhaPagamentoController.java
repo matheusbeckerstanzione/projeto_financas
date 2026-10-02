@@ -1,44 +1,49 @@
-package br.financeiro.Controller;
+package br.financeiro.controller;
 
-import br.financeiro.DTO.FolhaPagamentoDTO;
-import br.financeiro.Service.FolhaPagamentoService;
-import org.springframework.beans.factory.annotation.Autowired;
+import br.financeiro.DTO.request.FolhaPagamentoRequestDTO;
+import br.financeiro.DTO.response.FolhaPagamentoResponseDTO;
+import br.financeiro.service.FolhaPagamentoService;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("/folhas-pagamento")
-@CrossOrigin("*")
+@RequestMapping("/api/folhas-pagamento")
 public class FolhaPagamentoController {
 
-    @Autowired
-    private FolhaPagamentoService service;
+    private final FolhaPagamentoService folhaPagamentoService;
+
+    public FolhaPagamentoController(FolhaPagamentoService folhaPagamentoService) {
+        this.folhaPagamentoService = folhaPagamentoService;
+    }
 
     @GetMapping
-    public ResponseEntity<List<FolhaPagamentoDTO>> listarTodas() {
-        return ResponseEntity.ok(service.listarTodas());
+    public ResponseEntity<List<FolhaPagamentoResponseDTO>> listarTodas() {
+        return ResponseEntity.ok(folhaPagamentoService.listarTodas());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<FolhaPagamentoDTO> buscarPorId(@PathVariable Integer id) {
-        return ResponseEntity.ok(service.buscarPorId(id));
+    public ResponseEntity<FolhaPagamentoResponseDTO> buscarPorId(@PathVariable Long id) {
+        return ResponseEntity.ok(folhaPagamentoService.buscarPorId(id));
     }
 
     @PostMapping
-    public ResponseEntity<FolhaPagamentoDTO> criar(@RequestBody FolhaPagamentoDTO dto) {
-        return ResponseEntity.ok(service.salvar(dto));
+    public ResponseEntity<FolhaPagamentoResponseDTO> criar(@Valid @RequestBody FolhaPagamentoRequestDTO requestDTO) {
+        FolhaPagamentoResponseDTO criado = folhaPagamentoService.criar(requestDTO);
+        return ResponseEntity.status(HttpStatus.CREATED).body(criado);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<FolhaPagamentoDTO> atualizar(@PathVariable Integer id, @RequestBody FolhaPagamentoDTO dto) {
-        return ResponseEntity.ok(service.atualizar(id, dto));
+    public ResponseEntity<FolhaPagamentoResponseDTO> atualizar(@PathVariable Long id, @Valid @RequestBody FolhaPagamentoRequestDTO requestDTO) {
+        return ResponseEntity.ok(folhaPagamentoService.atualizar(id, requestDTO));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deletar(@PathVariable Integer id) {
-        service.deletar(id);
+    public ResponseEntity<Void> deletar(@PathVariable Long id) {
+        folhaPagamentoService.deletar(id);
         return ResponseEntity.noContent().build();
     }
 }

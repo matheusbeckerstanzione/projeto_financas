@@ -28,6 +28,9 @@ public class Empresa {
     @Column(unique = true, length = 14)
     private String cnpj;
 
+    @Column(name = "inscricao_estadual", length = 30)
+    private String inscricaoEstadual;
+
     private String plano;
 
     @Column(name = "logo_url")
@@ -51,6 +54,8 @@ public class Empresa {
     public void setNomeFantasia(String nomeFantasia) { this.nomeFantasia = nomeFantasia; }
     public String getCnpj() { return cnpj; }
     public void setCnpj(String cnpj) { this.cnpj = cnpj; }
+    public String getInscricaoEstadual() { return inscricaoEstadual; }
+    public void setInscricaoEstadual(String inscricaoEstadual) { this.inscricaoEstadual = inscricaoEstadual; }
     public String getPlano() { return plano; }
     public void setPlano(String plano) { this.plano = plano; }
     public String getLogoUrl() { return logoUrl; }

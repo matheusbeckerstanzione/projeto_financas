@@ -1,59 +1,90 @@
-package br.financeiro.Service;
+package br.financeiro.service;
 
-import br.financeiro.DTO.RelatorioDTO;
+import br.financeiro.DTO.request.RelatorioRequestDTO;
+import br.financeiro.DTO.response.RelatorioResponseDTO;
+import br.financeiro.model.Empresa;
 import br.financeiro.model.Relatorio;
+import br.financeiro.model.Usuario;
+import br.financeiro.repository.EmpresaRepository;
 import br.financeiro.repository.RelatorioRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import br.financeiro.repository.UsuarioRepository;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class RelatorioService {
 
-    @Autowired
-    private RelatorioRepository repository;
+    private final RelatorioRepository relatorioRepository;
+    private final EmpresaRepository empresaRepository;
+    private final UsuarioRepository usuarioRepository;
 
-    public List<RelatorioDTO> listarTodos() {
-        return repository.findAll()
-                .stream()
-                .map(this::paraDTO)
-                .collect(Collectors.toList());
+    public RelatorioService(RelatorioRepository relatorioRepository,
+                            EmpresaRepository empresaRepository,
+                            UsuarioRepository usuarioRepository) {
+        this.relatorioRepository = relatorioRepository;
+        this.empresaRepository = empresaRepository;
+        this.usuarioRepository = usuarioRepository;
     }
 
-    public RelatorioDTO buscarPorId(Integer id) {
-        Relatorio entity = repository.findById(id.longValue())
-                .orElseThrow(() -> new RuntimeException("Relatório não encontrado com ID: " + id));
-        return paraDTO(entity);
+    @Transactional(readOnly = true)
+    public List<RelatorioResponseDTO> listarTodos() {
+        return relatorioRepository.findAll().stream()
+                .map(RelatorioResponseDTO::fromEntity)
+                .toList();
     }
 
-    public RelatorioDTO salvar(RelatorioDTO dto) {
-        Relatorio entity = paraEntidade(dto);
-        Relatorio salva = repository.save(entity);
-        return paraDTO(salva);
+    @Transactional(readOnly = true)
+    public RelatorioResponseDTO buscarPorId(Long id) {
+        Relatorio relatorio = relatorioRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Relatório não encontrado com id: " + id));
+        return RelatorioResponseDTO.fromEntity(relatorio);
     }
 
-    public void deletar(Integer id) {
-        if (!repository.existsById(id.longValue())) {
-            throw new RuntimeException("Relatório não encontrado com ID: " + id);
+    @Transactional
+    public RelatorioResponseDTO criar(RelatorioRequestDTO dto) {
+        Relatorio relatorio = new Relatorio();
+        mapearDtoParaEntidade(dto, relatorio);
+        Relatorio salvo = relatorioRepository.save(relatorio);
+        return RelatorioResponseDTO.fromEntity(salvo);
+    }
+
+    @Transactional
+    public RelatorioResponseDTO atualizar(Long id, RelatorioRequestDTO dto) {
+        Relatorio relatorio = relatorioRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Relatório não encontrado com id: " + id));
+        mapearDtoParaEntidade(dto, relatorio);
+        Relatorio atualizado = relatorioRepository.save(relatorio);
+        return RelatorioResponseDTO.fromEntity(atualizado);
+    }
+
+    @Transactional
+    public void deletar(Long id) {
+        if (!relatorioRepository.existsById(id)) {
+            throw new EntityNotFoundException("Relatório não encontrado com id: " + id);
         }
-        repository.deleteById(id.longValue());
+        relatorioRepository.deleteById(id);
     }
 
-    private RelatorioDTO paraDTO(Relatorio entity) {
-        RelatorioDTO dto = new RelatorioDTO();
-        if (entity.getId() != null) {
-            dto.setId(entity.getId().intValue());
+    private void mapearDtoParaEntidade(RelatorioRequestDTO dto, Relatorio relatorio) {
+        if (dto.empresaId() != null) {
+            Empresa empresa = empresaRepository.findById(dto.empresaId())
+                    .orElseThrow(() -> new EntityNotFoundException("Empresa não encontrada com id: " + dto.empresaId()));
+            relatorio.setEmpresa(empresa);
         }
-        return dto;
-    }
 
-    private Relatorio paraEntidade(RelatorioDTO dto) {
-        Relatorio entity = new Relatorio();
-        if (dto.getId() != null) {
-            entity.setId(dto.getId().longValue());
+        if (dto.geradoPorId() != null) {
+            Usuario usuario = usuarioRepository.findById(dto.geradoPorId())
+                    .orElseThrow(() -> new EntityNotFoundException("Usuário não encontrado com id: " + dto.geradoPorId()));
+            relatorio.setGeradoPor(usuario);
+        } else {
+            relatorio.setGeradoPor(null);
         }
-        return entity;
+
+        relatorio.setTipo(dto.tipo());
+        relatorio.setStatus(dto.status());
+        relatorio.setDataGeracao(dto.dataGeracao());
     }
 }

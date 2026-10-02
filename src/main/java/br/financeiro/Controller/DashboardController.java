@@ -1,21 +1,35 @@
-package br.financeiro.Controller;
+package br.financeiro.controller;
 
-import br.financeiro.DTO.DashboardVisaoGeralDTO;
-import br.financeiro.Service.DashboardService;
-import org.springframework.beans.factory.annotation.Autowired;
+import br.financeiro.DTO.request.DashboardRequestDTO;
+import br.financeiro.DTO.response.DashboardResponseDTO;
+import br.financeiro.service.DashboardService;
+import jakarta.validation.Valid;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
+
 @RestController
-@RequestMapping("/dashboard")
-@CrossOrigin("*")
+@RequestMapping("/api/dashboard")
 public class DashboardController {
 
-    @Autowired
-    private DashboardService service;
+    private final DashboardService dashboardService;
 
-    @GetMapping("/visao-geral")
-    public ResponseEntity<DashboardVisaoGeralDTO> obterVisaoGeral() {
-        return ResponseEntity.ok(service.obterVisaoGeral());
+    public DashboardController(DashboardService dashboardService) {
+        this.dashboardService = dashboardService;
+    }
+
+    @GetMapping
+    public ResponseEntity<DashboardResponseDTO> obterResumo(
+            @RequestParam Long empresaId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataInicio,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataFim) {
+        return ResponseEntity.ok(dashboardService.obterResumo(empresaId, dataInicio, dataFim));
+    }
+
+    @PostMapping("/resumo")
+    public ResponseEntity<DashboardResponseDTO> obterResumoPorBody(@Valid @RequestBody DashboardRequestDTO dto) {
+        return ResponseEntity.ok(dashboardService.obterResumo(dto));
     }
 }

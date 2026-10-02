@@ -1,69 +1,77 @@
-package br.financeiro.Service;
+package br.financeiro.service;
 
-import br.financeiro.DTO.FaturamentoMensalDTO;
+import br.financeiro.DTO.request.FaturamentoMensalRequestDTO;
+import br.financeiro.DTO.response.FaturamentoMensalResponseDTO;
+import br.financeiro.model.Empresa;
 import br.financeiro.model.FaturamentoMensal;
+import br.financeiro.repository.EmpresaRepository;
 import br.financeiro.repository.FaturamentoMensalRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class FaturamentoMensalService {
 
-    @Autowired
-    private FaturamentoMensalRepository repository;
+    private final FaturamentoMensalRepository faturamentoMensalRepository;
+    private final EmpresaRepository empresaRepository;
 
-    public List<FaturamentoMensalDTO> listarTodos() {
-        return repository.findAll()
-                .stream()
-                .map(this::paraDTO)
-                .collect(Collectors.toList());
+    public FaturamentoMensalService(FaturamentoMensalRepository faturamentoMensalRepository,
+                                   EmpresaRepository empresaRepository) {
+        this.faturamentoMensalRepository = faturamentoMensalRepository;
+        this.empresaRepository = empresaRepository;
     }
 
-    public FaturamentoMensalDTO buscarPorId(Integer id) {
-        FaturamentoMensal entity = repository.findById(id.longValue())
-                .orElseThrow(() -> new RuntimeException("Faturamento Mensal não encontrado com ID: " + id));
-        return paraDTO(entity);
+    @Transactional(readOnly = true)
+    public List<FaturamentoMensalResponseDTO> listarTodos() {
+        return faturamentoMensalRepository.findAll().stream()
+                .map(FaturamentoMensalResponseDTO::fromEntity)
+                .toList();
     }
 
-    public FaturamentoMensalDTO salvar(FaturamentoMensalDTO dto) {
-        FaturamentoMensal entity = paraEntidade(dto);
-        FaturamentoMensal salva = repository.save(entity);
-        return paraDTO(salva);
+    @Transactional(readOnly = true)
+    public FaturamentoMensalResponseDTO buscarPorId(Long id) {
+        FaturamentoMensal faturamento = faturamentoMensalRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Faturamento Mensal não encontrado com id: " + id));
+        return FaturamentoMensalResponseDTO.fromEntity(faturamento);
     }
 
-    public FaturamentoMensalDTO atualizar(Integer id, FaturamentoMensalDTO dto) {
-        repository.findById(id.longValue())
-                .orElseThrow(() -> new RuntimeException("Faturamento Mensal não encontrado com ID: " + id));
-
-        dto.setId(id);
-        FaturamentoMensal entity = paraEntidade(dto);
-        FaturamentoMensal atualizada = repository.save(entity);
-        return paraDTO(atualizada);
+    @Transactional
+    public FaturamentoMensalResponseDTO criar(FaturamentoMensalRequestDTO dto) {
+        FaturamentoMensal faturamento = new FaturamentoMensal();
+        mapearDtoParaEntidade(dto, faturamento);
+        FaturamentoMensal salvo = faturamentoMensalRepository.save(faturamento);
+        return FaturamentoMensalResponseDTO.fromEntity(salvo);
     }
 
-    public void deletar(Integer id) {
-        if (!repository.existsById(id.longValue())) {
-            throw new RuntimeException("Faturamento Mensal não encontrado com ID: " + id);
+    @Transactional
+    public FaturamentoMensalResponseDTO atualizar(Long id, FaturamentoMensalRequestDTO dto) {
+        FaturamentoMensal faturamento = faturamentoMensalRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Faturamento Mensal não encontrado com id: " + id));
+        mapearDtoParaEntidade(dto, faturamento);
+        FaturamentoMensal atualizado = faturamentoMensalRepository.save(faturamento);
+        return FaturamentoMensalResponseDTO.fromEntity(atualizado);
+    }
+
+    @Transactional
+    public void deletar(Long id) {
+        if (!faturamentoMensalRepository.existsById(id)) {
+            throw new EntityNotFoundException("Faturamento Mensal não encontrado com id: " + id);
         }
-        repository.deleteById(id.longValue());
+        faturamentoMensalRepository.deleteById(id);
     }
 
-    private FaturamentoMensalDTO paraDTO(FaturamentoMensal entity) {
-        FaturamentoMensalDTO dto = new FaturamentoMensalDTO();
-        if (entity.getId() != null) {
-            dto.setId(entity.getId().intValue());
+    private void mapearDtoParaEntidade(FaturamentoMensalRequestDTO dto, FaturamentoMensal faturamento) {
+        if (dto.empresaId() != null) {
+            Empresa empresa = empresaRepository.findById(dto.empresaId())
+                    .orElseThrow(() -> new EntityNotFoundException("Empresa não encontrada com id: " + dto.empresaId()));
+            faturamento.setEmpresa(empresa);
         }
-        return dto;
-    }
-
-    private FaturamentoMensal paraEntidade(FaturamentoMensalDTO dto) {
-        FaturamentoMensal entity = new FaturamentoMensal();
-        if (dto.getId() != null) {
-            entity.setId(dto.getId().longValue());
-        }
-        return entity;
+        faturamento.setMesReferencia(dto.mesReferencia());
+        faturamento.setFaturamentoBruto(dto.faturamentoBruto());
+        faturamento.setLucroLiquido(dto.lucroLiquido());
+        faturamento.setDespesaTotal(dto.despesaTotal());
     }
 }

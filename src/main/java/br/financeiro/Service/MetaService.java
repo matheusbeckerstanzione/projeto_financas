@@ -1,69 +1,90 @@
-package br.financeiro.Service;
+package br.financeiro.service;
 
-import br.financeiro.DTO.MetaDTO;
+import br.financeiro.DTO.request.MetaRequestDTO;
+import br.financeiro.DTO.response.MetaResponseDTO;
+import br.financeiro.model.Departamento;
+import br.financeiro.model.Empresa;
 import br.financeiro.model.Meta;
+import br.financeiro.repository.DepartamentoRepository;
+import br.financeiro.repository.EmpresaRepository;
 import br.financeiro.repository.MetaRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class MetaService {
 
-    @Autowired
-    private MetaRepository repository;
+    private final MetaRepository metaRepository;
+    private final EmpresaRepository empresaRepository;
+    private final DepartamentoRepository departamentoRepository;
 
-    public List<MetaDTO> listarTodas() {
-        return repository.findAll()
-                .stream()
-                .map(this::paraDTO)
-                .collect(Collectors.toList());
+    public MetaService(MetaRepository metaRepository,
+                       EmpresaRepository empresaRepository,
+                       DepartamentoRepository departamentoRepository) {
+        this.metaRepository = metaRepository;
+        this.empresaRepository = empresaRepository;
+        this.departamentoRepository = departamentoRepository;
     }
 
-    public MetaDTO buscarPorId(Integer id) {
-        Meta entity = repository.findById(id.longValue())
-                .orElseThrow(() -> new RuntimeException("Meta não encontrada com ID: " + id));
-        return paraDTO(entity);
+    @Transactional(readOnly = true)
+    public List<MetaResponseDTO> listarTodas() {
+        return metaRepository.findAll().stream()
+                .map(MetaResponseDTO::fromEntity)
+                .toList();
     }
 
-    public MetaDTO salvar(MetaDTO dto) {
-        Meta entity = paraEntidade(dto);
-        Meta salva = repository.save(entity);
-        return paraDTO(salva);
+    @Transactional(readOnly = true)
+    public MetaResponseDTO buscarPorId(Long id) {
+        Meta meta = metaRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Meta não encontrada com id: " + id));
+        return MetaResponseDTO.fromEntity(meta);
     }
 
-    public MetaDTO atualizar(Integer id, MetaDTO dto) {
-        repository.findById(id.longValue())
-                .orElseThrow(() -> new RuntimeException("Meta não encontrada com ID: " + id));
-
-        dto.setId(id);
-        Meta entity = paraEntidade(dto);
-        Meta atualizada = repository.save(entity);
-        return paraDTO(atualizada);
+    @Transactional
+    public MetaResponseDTO criar(MetaRequestDTO dto) {
+        Meta meta = new Meta();
+        mapearDtoParaEntidade(dto, meta);
+        Meta salva = metaRepository.save(meta);
+        return MetaResponseDTO.fromEntity(salva);
     }
 
-    public void deletar(Integer id) {
-        if (!repository.existsById(id.longValue())) {
-            throw new RuntimeException("Meta não encontrada com ID: " + id);
+    @Transactional
+    public MetaResponseDTO atualizar(Long id, MetaRequestDTO dto) {
+        Meta meta = metaRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Meta não encontrada com id: " + id));
+        mapearDtoParaEntidade(dto, meta);
+        Meta atualizada = metaRepository.save(meta);
+        return MetaResponseDTO.fromEntity(atualizada);
+    }
+
+    @Transactional
+    public void deletar(Long id) {
+        if (!metaRepository.existsById(id)) {
+            throw new EntityNotFoundException("Meta não encontrada com id: " + id);
         }
-        repository.deleteById(id.longValue());
+        metaRepository.deleteById(id);
     }
 
-    private MetaDTO paraDTO(Meta entity) {
-        MetaDTO dto = new MetaDTO();
-        if (entity.getId() != null) {
-            dto.setId(entity.getId().intValue());
+    private void mapearDtoParaEntidade(MetaRequestDTO dto, Meta meta) {
+        if (dto.empresaId() != null) {
+            Empresa empresa = empresaRepository.findById(dto.empresaId())
+                    .orElseThrow(() -> new EntityNotFoundException("Empresa não encontrada com id: " + dto.empresaId()));
+            meta.setEmpresa(empresa);
         }
-        return dto;
-    }
 
-    private Meta paraEntidade(MetaDTO dto) {
-        Meta entity = new Meta();
-        if (dto.getId() != null) {
-            entity.setId(dto.getId().longValue());
+        if (dto.departamentoId() != null) {
+            Departamento departamento = departamentoRepository.findById(dto.departamentoId())
+                    .orElseThrow(() -> new EntityNotFoundException("Departamento não encontrado com id: " + dto.departamentoId()));
+            meta.setDepartamento(departamento);
+        } else {
+            meta.setDepartamento(null);
         }
-        return entity;
+
+        meta.setPercentualProgresso(dto.percentualProgresso());
+        meta.setStatus(dto.status());
+        meta.setPrazo(dto.prazo());
     }
 }

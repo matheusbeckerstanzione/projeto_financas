@@ -1,33 +1,49 @@
-package br.financeiro.Controller;
+package br.financeiro.controller;
 
-import br.financeiro.DTO.AuditoriaDTO;
-import br.financeiro.Service.AuditoriaService;
-import org.springframework.beans.factory.annotation.Autowired;
+import br.financeiro.DTO.request.AuditoriaRequestDTO;
+import br.financeiro.DTO.response.AuditoriaResponseDTO;
+import br.financeiro.service.AuditoriaService;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("/auditorias")
-@CrossOrigin("*")
+@RequestMapping("/api/auditorias")
 public class AuditoriaController {
 
-    @Autowired
-    private AuditoriaService service;
+    private final AuditoriaService auditoriaService;
+
+    public AuditoriaController(AuditoriaService auditoriaService) {
+        this.auditoriaService = auditoriaService;
+    }
 
     @GetMapping
-    public ResponseEntity<List<AuditoriaDTO>> listarTodos() {
-        return ResponseEntity.ok(service.listarAuditorias());
+    public ResponseEntity<List<AuditoriaResponseDTO>> listarTodas() {
+        return ResponseEntity.ok(auditoriaService.listarTodas());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<AuditoriaDTO> buscarPorId(@PathVariable Long id) {
-        return ResponseEntity.ok(service.buscarAuditoriaPorId(id));
+    public ResponseEntity<AuditoriaResponseDTO> buscarPorId(@PathVariable Long id) {
+        return ResponseEntity.ok(auditoriaService.buscarPorId(id));
     }
 
     @PostMapping
-    public ResponseEntity<AuditoriaDTO> criar(@RequestBody AuditoriaDTO dto) {
-        return ResponseEntity.ok(service.salvarAuditoria(dto));
+    public ResponseEntity<AuditoriaResponseDTO> criar(@Valid @RequestBody AuditoriaRequestDTO requestDTO) {
+        AuditoriaResponseDTO criada = auditoriaService.criar(requestDTO);
+        return ResponseEntity.status(HttpStatus.CREATED).body(criada);
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<AuditoriaResponseDTO> atualizar(@PathVariable Long id, @Valid @RequestBody AuditoriaRequestDTO requestDTO) {
+        return ResponseEntity.ok(auditoriaService.atualizar(id, requestDTO));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deletar(@PathVariable Long id) {
+        auditoriaService.deletar(id);
+        return ResponseEntity.noContent().build();
     }
 }

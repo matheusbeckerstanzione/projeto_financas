@@ -1,44 +1,49 @@
-package br.financeiro.Controller;
+package br.financeiro.controller;
 
-import br.financeiro.DTO.MetaDTO;
-import br.financeiro.Service.MetaService;
-import org.springframework.beans.factory.annotation.Autowired;
+import br.financeiro.DTO.request.MetaRequestDTO;
+import br.financeiro.DTO.response.MetaResponseDTO;
+import br.financeiro.service.MetaService;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("/metas")
-@CrossOrigin("*")
+@RequestMapping("/api/metas")
 public class MetaController {
 
-    @Autowired
-    private MetaService service;
+    private final MetaService metaService;
+
+    public MetaController(MetaService metaService) {
+        this.metaService = metaService;
+    }
 
     @GetMapping
-    public ResponseEntity<List<MetaDTO>> listarTodas() {
-        return ResponseEntity.ok(service.listarTodas());
+    public ResponseEntity<List<MetaResponseDTO>> listarTodas() {
+        return ResponseEntity.ok(metaService.listarTodas());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<MetaDTO> buscarPorId(@PathVariable Integer id) {
-        return ResponseEntity.ok(service.buscarPorId(id));
+    public ResponseEntity<MetaResponseDTO> buscarPorId(@PathVariable Long id) {
+        return ResponseEntity.ok(metaService.buscarPorId(id));
     }
 
     @PostMapping
-    public ResponseEntity<MetaDTO> criar(@RequestBody MetaDTO dto) {
-        return ResponseEntity.ok(service.salvar(dto));
+    public ResponseEntity<MetaResponseDTO> criar(@Valid @RequestBody MetaRequestDTO requestDTO) {
+        MetaResponseDTO criado = metaService.criar(requestDTO);
+        return ResponseEntity.status(HttpStatus.CREATED).body(criado);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<MetaDTO> atualizar(@PathVariable Integer id, @RequestBody MetaDTO dto) {
-        return ResponseEntity.ok(service.atualizar(id, dto));
+    public ResponseEntity<MetaResponseDTO> atualizar(@PathVariable Long id, @Valid @RequestBody MetaRequestDTO requestDTO) {
+        return ResponseEntity.ok(metaService.atualizar(id, requestDTO));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deletar(@PathVariable Integer id) {
-        service.deletar(id);
+    public ResponseEntity<Void> deletar(@PathVariable Long id) {
+        metaService.deletar(id);
         return ResponseEntity.noContent().build();
     }
 }

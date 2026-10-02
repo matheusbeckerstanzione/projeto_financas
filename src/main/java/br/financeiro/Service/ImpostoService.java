@@ -1,74 +1,76 @@
-package br.financeiro.Service;
+package br.financeiro.service;
 
-import br.financeiro.DTO.ImpostoDTO;
-import br.financeiro.DTO.ImpostoResumoDTO;
+import br.financeiro.DTO.request.ImpostoRequestDTO;
+import br.financeiro.DTO.response.ImpostoResponseDTO;
+import br.financeiro.model.Empresa;
 import br.financeiro.model.Imposto;
+import br.financeiro.repository.EmpresaRepository;
 import br.financeiro.repository.ImpostoRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class ImpostoService {
 
-    @Autowired
-    private ImpostoRepository repository;
+    private final ImpostoRepository impostoRepository;
+    private final EmpresaRepository empresaRepository;
 
-    public List<ImpostoDTO> listarTodos() {
-        return repository.findAll()
-                .stream()
-                .map(this::paraDTO)
-                .collect(Collectors.toList());
+    public ImpostoService(ImpostoRepository impostoRepository, EmpresaRepository empresaRepository) {
+        this.impostoRepository = impostoRepository;
+        this.empresaRepository = empresaRepository;
     }
 
-    public ImpostoDTO buscarPorId(Integer id) {
-        Imposto entity = repository.findById(id.longValue())
-                .orElseThrow(() -> new RuntimeException("Imposto não encontrado com ID: " + id));
-        return paraDTO(entity);
+    @Transactional(readOnly = true)
+    public List<ImpostoResponseDTO> listarTodos() {
+        return impostoRepository.findAll().stream()
+                .map(ImpostoResponseDTO::fromEntity)
+                .toList();
     }
 
-    public ImpostoResumoDTO obterResumoImpostos() {
-        return new ImpostoResumoDTO();
+    @Transactional(readOnly = true)
+    public ImpostoResponseDTO buscarPorId(Long id) {
+        Imposto imposto = impostoRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Imposto não encontrado com id: " + id));
+        return ImpostoResponseDTO.fromEntity(imposto);
     }
 
-    public ImpostoDTO salvar(ImpostoDTO dto) {
-        Imposto entity = paraEntidade(dto);
-        Imposto salva = repository.save(entity);
-        return paraDTO(salva);
+    @Transactional
+    public ImpostoResponseDTO criar(ImpostoRequestDTO dto) {
+        Imposto imposto = new Imposto();
+        mapearDtoParaEntidade(dto, imposto);
+        Imposto salvo = impostoRepository.save(imposto);
+        return ImpostoResponseDTO.fromEntity(salvo);
     }
 
-    public ImpostoDTO atualizar(Integer id, ImpostoDTO dto) {
-        repository.findById(id.longValue())
-                .orElseThrow(() -> new RuntimeException("Imposto não encontrado com ID: " + id));
-
-        dto.setId(id);
-        Imposto entity = paraEntidade(dto);
-        Imposto atualizada = repository.save(entity);
-        return paraDTO(atualizada);
+    @Transactional
+    public ImpostoResponseDTO atualizar(Long id, ImpostoRequestDTO dto) {
+        Imposto imposto = impostoRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Imposto não encontrado com id: " + id));
+        mapearDtoParaEntidade(dto, imposto);
+        Imposto atualizado = impostoRepository.save(imposto);
+        return ImpostoResponseDTO.fromEntity(atualizado);
     }
 
-    public void deletar(Integer id) {
-        if (!repository.existsById(id.longValue())) {
-            throw new RuntimeException("Imposto não encontrado com ID: " + id);
+    @Transactional
+    public void deletar(Long id) {
+        if (!impostoRepository.existsById(id)) {
+            throw new EntityNotFoundException("Imposto não encontrado com id: " + id);
         }
-        repository.deleteById(id.longValue());
+        impostoRepository.deleteById(id);
     }
 
-    private ImpostoDTO paraDTO(Imposto entity) {
-        ImpostoDTO dto = new ImpostoDTO();
-        if (entity.getId() != null) {
-            dto.setId(entity.getId().intValue());
+    private void mapearDtoParaEntidade(ImpostoRequestDTO dto, Imposto imposto) {
+        if (dto.empresaId() != null) {
+            Empresa empresa = empresaRepository.findById(dto.empresaId())
+                    .orElseThrow(() -> new EntityNotFoundException("Empresa não encontrada com id: " + dto.empresaId()));
+            imposto.setEmpresa(empresa);
         }
-        return dto;
-    }
-
-    private Imposto paraEntidade(ImpostoDTO dto) {
-        Imposto entity = new Imposto();
-        if (dto.getId() != null) {
-            entity.setId(dto.getId().longValue());
-        }
-        return entity;
+        imposto.setTipo(dto.tipo());
+        imposto.setValor(dto.valor());
+        imposto.setStatus(dto.status());
+        imposto.setDataVencimento(dto.dataVencimento());
     }
 }

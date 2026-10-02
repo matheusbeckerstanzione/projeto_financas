@@ -1,59 +1,104 @@
-package br.financeiro.Service;
+package br.financeiro.service;
 
-import br.financeiro.DTO.MovimentacaoEstoqueDTO;
+import br.financeiro.DTO.request.MovimentacaoEstoqueRequestDTO;
+import br.financeiro.DTO.response.MovimentacaoEstoqueResponseDTO;
+import br.financeiro.model.Funcionario;
+import br.financeiro.model.Lote;
 import br.financeiro.model.MovimentacaoEstoque;
+import br.financeiro.model.Produto;
+import br.financeiro.repository.FuncionarioRepository;
+import br.financeiro.repository.LoteRepository;
 import br.financeiro.repository.MovimentacaoEstoqueRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import br.financeiro.repository.ProdutoRepository;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class MovimentacaoEstoqueService {
 
-    @Autowired
-    private MovimentacaoEstoqueRepository repository;
+    private final MovimentacaoEstoqueRepository movimentacaoEstoqueRepository;
+    private final ProdutoRepository produtoRepository;
+    private final LoteRepository loteRepository;
+    private final FuncionarioRepository funcionarioRepository;
 
-    public List<MovimentacaoEstoqueDTO> listarTodas() {
-        return repository.findAll()
-                .stream()
-                .map(this::paraDTO)
-                .collect(Collectors.toList());
+    public MovimentacaoEstoqueService(MovimentacaoEstoqueRepository movimentacaoEstoqueRepository,
+                                      ProdutoRepository produtoRepository,
+                                      LoteRepository loteRepository,
+                                      FuncionarioRepository funcionarioRepository) {
+        this.movimentacaoEstoqueRepository = movimentacaoEstoqueRepository;
+        this.produtoRepository = produtoRepository;
+        this.loteRepository = loteRepository;
+        this.funcionarioRepository = funcionarioRepository;
     }
 
-    public MovimentacaoEstoqueDTO buscarPorId(Integer id) {
-        MovimentacaoEstoque entity = repository.findById(id.longValue())
-                .orElseThrow(() -> new RuntimeException("Movimentação de Estoque não encontrada com ID: " + id));
-        return paraDTO(entity);
+    @Transactional(readOnly = true)
+    public List<MovimentacaoEstoqueResponseDTO> listarTodas() {
+        return movimentacaoEstoqueRepository.findAll().stream()
+                .map(MovimentacaoEstoqueResponseDTO::fromEntity)
+                .toList();
     }
 
-    public MovimentacaoEstoqueDTO salvar(MovimentacaoEstoqueDTO dto) {
-        MovimentacaoEstoque entity = paraEntidade(dto);
-        MovimentacaoEstoque salva = repository.save(entity);
-        return paraDTO(salva);
+    @Transactional(readOnly = true)
+    public MovimentacaoEstoqueResponseDTO buscarPorId(Long id) {
+        MovimentacaoEstoque entity = movimentacaoEstoqueRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Movimentação de estoque não encontrada com id: " + id));
+        return MovimentacaoEstoqueResponseDTO.fromEntity(entity);
     }
 
-    public void deletar(Integer id) {
-        if (!repository.existsById(id.longValue())) {
-            throw new RuntimeException("Movimentação de Estoque não encontrada com ID: " + id);
-        }
-        repository.deleteById(id.longValue());
-    }
-
-    private MovimentacaoEstoqueDTO paraDTO(MovimentacaoEstoque entity) {
-        MovimentacaoEstoqueDTO dto = new MovimentacaoEstoqueDTO();
-        if (entity.getId() != null) {
-            dto.setId(entity.getId().intValue());
-        }
-        return dto;
-    }
-
-    private MovimentacaoEstoque paraEntidade(MovimentacaoEstoqueDTO dto) {
+    @Transactional
+    public MovimentacaoEstoqueResponseDTO criar(MovimentacaoEstoqueRequestDTO dto) {
         MovimentacaoEstoque entity = new MovimentacaoEstoque();
-        if (dto.getId() != null) {
-            entity.setId(dto.getId().longValue());
+        mapearDtoParaEntidade(dto, entity);
+        MovimentacaoEstoque salvo = movimentacaoEstoqueRepository.save(entity);
+        return MovimentacaoEstoqueResponseDTO.fromEntity(salvo);
+    }
+
+    @Transactional
+    public MovimentacaoEstoqueResponseDTO atualizar(Long id, MovimentacaoEstoqueRequestDTO dto) {
+        MovimentacaoEstoque entity = movimentacaoEstoqueRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Movimentação de estoque não encontrada com id: " + id));
+        mapearDtoParaEntidade(dto, entity);
+        MovimentacaoEstoque atualizado = movimentacaoEstoqueRepository.save(entity);
+        return MovimentacaoEstoqueResponseDTO.fromEntity(atualizado);
+    }
+
+    @Transactional
+    public void deletar(Long id) {
+        if (!movimentacaoEstoqueRepository.existsById(id)) {
+            throw new EntityNotFoundException("Movimentação de estoque não encontrada com id: " + id);
         }
-        return entity;
+        movimentacaoEstoqueRepository.deleteById(id);
+    }
+
+    private void mapearDtoParaEntidade(MovimentacaoEstoqueRequestDTO dto, MovimentacaoEstoque entity) {
+        if (dto.produtoId() != null) {
+            Produto produto = produtoRepository.findById(dto.produtoId())
+                    .orElseThrow(() -> new EntityNotFoundException("Produto não encontrado com id: " + dto.produtoId()));
+            entity.setProduto(produto);
+        }
+
+        if (dto.loteId() != null) {
+            Lote lote = loteRepository.findById(dto.loteId())
+                    .orElseThrow(() -> new EntityNotFoundException("Lote não encontrado com id: " + dto.loteId()));
+            entity.setLote(lote);
+        } else {
+            entity.setLote(null);
+        }
+
+        if (dto.funcionarioId() != null) {
+            Funcionario funcionario = funcionarioRepository.findById(dto.funcionarioId())
+                    .orElseThrow(() -> new EntityNotFoundException("Funcionário não encontrado com id: " + dto.funcionarioId()));
+            entity.setFuncionario(funcionario);
+        } else {
+            entity.setFuncionario(null);
+        }
+
+        entity.setTipo(dto.tipo());
+        entity.setMotivo(dto.motivo());
+        entity.setQuantidade(dto.quantidade());
+        entity.setDataHora(dto.dataHora());
     }
 }

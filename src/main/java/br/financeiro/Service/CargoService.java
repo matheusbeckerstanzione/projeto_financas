@@ -1,69 +1,64 @@
-package br.financeiro.Service;
+package br.financeiro.service;
 
-import br.financeiro.DTO.CargoDTO;
+import br.financeiro.DTO.request.CargoRequestDTO;
+import br.financeiro.DTO.response.CargoResponseDTO;
 import br.financeiro.model.Cargo;
 import br.financeiro.repository.CargoRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class CargoService {
 
-    @Autowired
-    private CargoRepository repository;
+    private final CargoRepository cargoRepository;
 
-    public List<CargoDTO> listarCargos() {
-        return repository.findAll()
-                .stream()
-                .map(this::paraDTO)
-                .collect(Collectors.toList());
+    public CargoService(CargoRepository cargoRepository) {
+        this.cargoRepository = cargoRepository;
     }
 
-    public CargoDTO buscarCargoPorId(Integer id) {
-        Cargo entity = repository.findById(id.longValue())
-                .orElseThrow(() -> new RuntimeException("Cargo não encontrado com ID: " + id));
-        return paraDTO(entity);
+    @Transactional(readOnly = true)
+    public List<CargoResponseDTO> listarTodos() {
+        return cargoRepository.findAll().stream()
+                .map(CargoResponseDTO::fromEntity)
+                .toList();
     }
 
-    public CargoDTO salvarCargo(CargoDTO dto) {
-        Cargo entity = paraEntidade(dto);
-        Cargo salva = repository.save(entity);
-        return paraDTO(salva);
+    @Transactional(readOnly = true)
+    public CargoResponseDTO buscarPorId(Long id) {
+        Cargo cargo = cargoRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Cargo não encontrado com id: " + id));
+        return CargoResponseDTO.fromEntity(cargo);
     }
 
-    public CargoDTO atualizarCargo(Integer id, CargoDTO dto) {
-        repository.findById(id.longValue())
-                .orElseThrow(() -> new RuntimeException("Cargo não encontrado com ID: " + id));
-
-        dto.setId(id);
-        Cargo entity = paraEntidade(dto);
-        Cargo atualizada = repository.save(entity);
-        return paraDTO(atualizada);
+    @Transactional
+    public CargoResponseDTO criar(CargoRequestDTO dto) {
+        Cargo cargo = new Cargo();
+        mapearDtoParaEntidade(dto, cargo);
+        Cargo salvo = cargoRepository.save(cargo);
+        return CargoResponseDTO.fromEntity(salvo);
     }
 
-    public void deletarCargo(Integer id) {
-        if (!repository.existsById(id.longValue())) {
-            throw new RuntimeException("Cargo não encontrado com ID: " + id);
+    @Transactional
+    public CargoResponseDTO atualizar(Long id, CargoRequestDTO dto) {
+        Cargo cargo = cargoRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Cargo não encontrado com id: " + id));
+        mapearDtoParaEntidade(dto, cargo);
+        Cargo atualizado = cargoRepository.save(cargo);
+        return CargoResponseDTO.fromEntity(atualizado);
+    }
+
+    @Transactional
+    public void deletar(Long id) {
+        if (!cargoRepository.existsById(id)) {
+            throw new EntityNotFoundException("Cargo não encontrado com id: " + id);
         }
-        repository.deleteById(id.longValue());
+        cargoRepository.deleteById(id);
     }
 
-    private CargoDTO paraDTO(Cargo entity) {
-        CargoDTO dto = new CargoDTO();
-        if (entity.getId() != null) {
-            dto.setId(entity.getId().intValue());
-        }
-        return dto;
-    }
-
-    private Cargo paraEntidade(CargoDTO dto) {
-        Cargo entity = new Cargo();
-        if (dto.getId() != null) {
-            entity.setId(dto.getId().longValue());
-        }
-        return entity;
+    private void mapearDtoParaEntidade(CargoRequestDTO dto, Cargo cargo) {
+        cargo.setNome(dto.nome());
     }
 }

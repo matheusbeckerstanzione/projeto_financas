@@ -1,67 +1,87 @@
-package br.financeiro.Service;
+package br.financeiro.service;
 
-import br.financeiro.DTO.FuncionarioBeneficioDTO;
+import br.financeiro.DTO.request.FuncionarioBeneficioRequestDTO;
+import br.financeiro.DTO.response.FuncionarioBeneficioResponseDTO;
+import br.financeiro.model.Beneficio;
+import br.financeiro.model.Funcionario;
 import br.financeiro.model.FuncionarioBeneficio;
+import br.financeiro.model.FuncionarioBeneficioId;
+import br.financeiro.repository.BeneficioRepository;
 import br.financeiro.repository.FuncionarioBeneficioRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import br.financeiro.repository.FuncionarioRepository;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class FuncionarioBeneficioService {
 
-    @Autowired
-    private FuncionarioBeneficioRepository repository;
+    private final FuncionarioBeneficioRepository funcionarioBeneficioRepository;
+    private final FuncionarioRepository funcionarioRepository;
+    private final BeneficioRepository beneficioRepository;
 
-    public List<FuncionarioBeneficioDTO> listarTodos() {
-        return repository.findAll()
-                .stream()
-                .map(this::paraDTO)
-                .collect(Collectors.toList());
+    public FuncionarioBeneficioService(FuncionarioBeneficioRepository funcionarioBeneficioRepository,
+                                       FuncionarioRepository funcionarioRepository,
+                                       BeneficioRepository beneficioRepository) {
+        this.funcionarioBeneficioRepository = funcionarioBeneficioRepository;
+        this.funcionarioRepository = funcionarioRepository;
+        this.beneficioRepository = beneficioRepository;
     }
 
-    public FuncionarioBeneficioDTO buscarPorIds(Integer funcionarioId, Integer beneficioId) {
-        return repository.findAll()
-                .stream()
-                .filter(fb -> fb.getFuncionario() != null && fb.getFuncionario().getId().equals(funcionarioId.longValue()) &&
-                              fb.getBeneficio() != null && fb.getBeneficio().getId().equals(beneficioId.longValue()))
-                .findFirst()
-                .map(this::paraDTO)
-                .orElseThrow(() -> new RuntimeException("Associação FuncionarioBeneficio não encontrada."));
+    @Transactional(readOnly = true)
+    public List<FuncionarioBeneficioResponseDTO> listarTodos() {
+        return funcionarioBeneficioRepository.findAll().stream()
+                .map(FuncionarioBeneficioResponseDTO::fromEntity)
+                .toList();
     }
 
-    public FuncionarioBeneficioDTO salvar(FuncionarioBeneficioDTO dto) {
-        FuncionarioBeneficio entity = paraEntidade(dto);
-        FuncionarioBeneficio salva = repository.save(entity);
-        return paraDTO(salva);
+    @Transactional(readOnly = true)
+    public FuncionarioBeneficioResponseDTO buscarPorId(Long funcionarioId, Long beneficioId) {
+        FuncionarioBeneficioId id = new FuncionarioBeneficioId(funcionarioId, beneficioId);
+        FuncionarioBeneficio entity = funcionarioBeneficioRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Associação Funcionário-Benefício não encontrada para os IDs informados."));
+        return FuncionarioBeneficioResponseDTO.fromEntity(entity);
     }
 
-    public void deletar(Integer funcionarioId, Integer beneficioId) {
-        FuncionarioBeneficio existente = repository.findAll()
-                .stream()
-                .filter(fb -> fb.getFuncionario() != null && fb.getFuncionario().getId().equals(funcionarioId.longValue()) &&
-                              fb.getBeneficio() != null && fb.getBeneficio().getId().equals(beneficioId.longValue()))
-                .findFirst()
-                .orElseThrow(() -> new RuntimeException("Associação FuncionarioBeneficio não encontrada para remoção."));
-        
-        repository.delete(existente);
-    }
-
-    private FuncionarioBeneficioDTO paraDTO(FuncionarioBeneficio entity) {
-        FuncionarioBeneficioDTO dto = new FuncionarioBeneficioDTO();
-        if (entity.getFuncionario() != null && entity.getFuncionario().getId() != null) {
-            dto.setFuncionarioId(entity.getFuncionario().getId().intValue());
-        }
-        if (entity.getBeneficio() != null && entity.getBeneficio().getId() != null) {
-            dto.setBeneficioId(entity.getBeneficio().getId().intValue());
-        }
-        return dto;
-    }
-
-    private FuncionarioBeneficio paraEntidade(FuncionarioBeneficioDTO dto) {
+    @Transactional
+    public FuncionarioBeneficioResponseDTO criar(FuncionarioBeneficioRequestDTO dto) {
         FuncionarioBeneficio entity = new FuncionarioBeneficio();
-        return entity;
+        mapearDtoParaEntidade(dto, entity);
+        FuncionarioBeneficio salva = funcionarioBeneficioRepository.save(entity);
+        return FuncionarioBeneficioResponseDTO.fromEntity(salva);
+    }
+
+    @Transactional
+    public FuncionarioBeneficioResponseDTO atualizar(Long funcionarioId, Long beneficioId, FuncionarioBeneficioRequestDTO dto) {
+        FuncionarioBeneficioId id = new FuncionarioBeneficioId(funcionarioId, beneficioId);
+        FuncionarioBeneficio entity = funcionarioBeneficioRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Associação Funcionário-Benefício não encontrada para os IDs informados."));
+        mapearDtoParaEntidade(dto, entity);
+        FuncionarioBeneficio atualizada = funcionarioBeneficioRepository.save(entity);
+        return FuncionarioBeneficioResponseDTO.fromEntity(atualizada);
+    }
+
+    @Transactional
+    public void deletar(Long funcionarioId, Long beneficioId) {
+        FuncionarioBeneficioId id = new FuncionarioBeneficioId(funcionarioId, beneficioId);
+        if (!funcionarioBeneficioRepository.existsById(id)) {
+            throw new EntityNotFoundException("Associação Funcionário-Benefício não encontrada para os IDs informados.");
+        }
+        funcionarioBeneficioRepository.deleteById(id);
+    }
+
+    private void mapearDtoParaEntidade(FuncionarioBeneficioRequestDTO dto, FuncionarioBeneficio entity) {
+        Funcionario funcionario = funcionarioRepository.findById(dto.funcionarioId())
+                .orElseThrow(() -> new EntityNotFoundException("Funcionário não encontrado com id: " + dto.funcionarioId()));
+        Beneficio beneficio = beneficioRepository.findById(dto.beneficioId())
+                .orElseThrow(() -> new EntityNotFoundException("Benefício não encontrado com id: " + dto.beneficioId()));
+
+        FuncionarioBeneficioId id = new FuncionarioBeneficioId(dto.funcionarioId(), dto.beneficioId());
+        entity.setId(id);
+        entity.setFuncionario(funcionario);
+        entity.setBeneficio(beneficio);
+        entity.setDataAdesao(dto.dataAdesao());
     }
 }

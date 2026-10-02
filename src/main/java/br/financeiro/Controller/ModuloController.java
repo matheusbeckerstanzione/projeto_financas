@@ -1,44 +1,49 @@
-package br.financeiro.Controller;
+package br.financeiro.controller;
 
-import br.financeiro.DTO.ModuloDTO;
-import br.financeiro.Service.ModuloService;
-import org.springframework.beans.factory.annotation.Autowired;
+import br.financeiro.DTO.request.ModuloRequestDTO;
+import br.financeiro.DTO.response.ModuloResponseDTO;
+import br.financeiro.service.ModuloService;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("/modulos")
-@CrossOrigin("*")
+@RequestMapping("/api/modulos")
 public class ModuloController {
 
-    @Autowired
-    private ModuloService service;
+    private final ModuloService moduloService;
+
+    public ModuloController(ModuloService moduloService) {
+        this.moduloService = moduloService;
+    }
 
     @GetMapping
-    public ResponseEntity<List<ModuloDTO>> listarTodos() {
-        return ResponseEntity.ok(service.listarTodos());
+    public ResponseEntity<List<ModuloResponseDTO>> listarTodos() {
+        return ResponseEntity.ok(moduloService.listarTodos());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ModuloDTO> buscarPorId(@PathVariable Integer id) {
-        return ResponseEntity.ok(service.buscarPorId(id));
+    public ResponseEntity<ModuloResponseDTO> buscarPorId(@PathVariable Long id) {
+        return ResponseEntity.ok(moduloService.buscarPorId(id));
     }
 
     @PostMapping
-    public ResponseEntity<ModuloDTO> criar(@RequestBody ModuloDTO dto) {
-        return ResponseEntity.ok(service.salvar(dto));
+    public ResponseEntity<ModuloResponseDTO> criar(@Valid @RequestBody ModuloRequestDTO requestDTO) {
+        ModuloResponseDTO criado = moduloService.criar(requestDTO);
+        return ResponseEntity.status(HttpStatus.CREATED).body(criado);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ModuloDTO> atualizar(@PathVariable Integer id, @RequestBody ModuloDTO dto) {
-        return ResponseEntity.ok(service.atualizar(id, dto));
+    public ResponseEntity<ModuloResponseDTO> atualizar(@PathVariable Long id, @Valid @RequestBody ModuloRequestDTO requestDTO) {
+        return ResponseEntity.ok(moduloService.atualizar(id, requestDTO));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deletar(@PathVariable Integer id) {
-        service.deletar(id);
+    public ResponseEntity<Void> deletar(@PathVariable Long id) {
+        moduloService.deletar(id);
         return ResponseEntity.noContent().build();
     }
 }

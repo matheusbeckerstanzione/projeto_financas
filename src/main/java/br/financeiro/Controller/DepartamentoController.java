@@ -1,44 +1,49 @@
-package br.financeiro.Controller;
+package br.financeiro.controller;
 
-import br.financeiro.DTO.DepartamentoDTO;
-import br.financeiro.Service.DepartamentoService;
-import org.springframework.beans.factory.annotation.Autowired;
+import br.financeiro.DTO.request.DepartamentoRequestDTO;
+import br.financeiro.DTO.response.DepartamentoResponseDTO;
+import br.financeiro.service.DepartamentoService;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("/departamentos")
-@CrossOrigin("*")
+@RequestMapping("/api/departamentos")
 public class DepartamentoController {
 
-    @Autowired
-    private DepartamentoService service;
+    private final DepartamentoService departamentoService;
+
+    public DepartamentoController(DepartamentoService departamentoService) {
+        this.departamentoService = departamentoService;
+    }
 
     @GetMapping
-    public ResponseEntity<List<DepartamentoDTO>> listarTodos() {
-        return ResponseEntity.ok(service.listarTodos());
+    public ResponseEntity<List<DepartamentoResponseDTO>> listarTodos() {
+        return ResponseEntity.ok(departamentoService.listarTodos());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<DepartamentoDTO> buscarPorId(@PathVariable Integer id) {
-        return ResponseEntity.ok(service.buscarPorId(id));
+    public ResponseEntity<DepartamentoResponseDTO> buscarPorId(@PathVariable Long id) {
+        return ResponseEntity.ok(departamentoService.buscarPorId(id));
     }
 
     @PostMapping
-    public ResponseEntity<DepartamentoDTO> criar(@RequestBody DepartamentoDTO dto) {
-        return ResponseEntity.ok(service.salvar(dto));
+    public ResponseEntity<DepartamentoResponseDTO> criar(@Valid @RequestBody DepartamentoRequestDTO requestDTO) {
+        DepartamentoResponseDTO criado = departamentoService.criar(requestDTO);
+        return ResponseEntity.status(HttpStatus.CREATED).body(criado);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<DepartamentoDTO> atualizar(@PathVariable Integer id, @RequestBody DepartamentoDTO dto) {
-        return ResponseEntity.ok(service.atualizar(id, dto));
+    public ResponseEntity<DepartamentoResponseDTO> atualizar(@PathVariable Long id, @Valid @RequestBody DepartamentoRequestDTO requestDTO) {
+        return ResponseEntity.ok(departamentoService.atualizar(id, requestDTO));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deletar(@PathVariable Integer id) {
-        service.deletar(id);
+    public ResponseEntity<Void> deletar(@PathVariable Long id) {
+        departamentoService.deletar(id);
         return ResponseEntity.noContent().build();
     }
 }

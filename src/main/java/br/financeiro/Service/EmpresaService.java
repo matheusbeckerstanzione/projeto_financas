@@ -1,69 +1,76 @@
-package br.financeiro.Service;
+package br.financeiro.service;
 
-import br.financeiro.DTO.EmpresaDTO;
+import br.financeiro.DTO.request.EmpresaRequestDTO;
+import br.financeiro.DTO.response.EmpresaResponseDTO;
 import br.financeiro.model.Empresa;
 import br.financeiro.repository.EmpresaRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class EmpresaService {
 
-    @Autowired
-    private EmpresaRepository repository;
+    private final EmpresaRepository empresaRepository;
 
-    public List<EmpresaDTO> listarTodas() {
-        return repository.findAll()
-                .stream()
-                .map(this::paraDTO)
-                .collect(Collectors.toList());
+    public EmpresaService(EmpresaRepository empresaRepository) {
+        this.empresaRepository = empresaRepository;
     }
 
-    public EmpresaDTO buscarPorId(Integer id) {
-        Empresa entity = repository.findById(id.longValue())
-                .orElseThrow(() -> new RuntimeException("Empresa não encontrada com ID: " + id));
-        return paraDTO(entity);
+    @Transactional(readOnly = true)
+    public List<EmpresaResponseDTO> listarTodos() {
+        return empresaRepository.findAll().stream()
+                .map(EmpresaResponseDTO::fromEntity)
+                .toList();
     }
 
-    public EmpresaDTO salvar(EmpresaDTO dto) {
-        Empresa entity = paraEntidade(dto);
-        Empresa salva = repository.save(entity);
-        return paraDTO(salva);
+    @Transactional(readOnly = true)
+    public EmpresaResponseDTO buscarPorId(Long id) {
+        Empresa empresa = empresaRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Empresa não encontrada com id: " + id));
+        return EmpresaResponseDTO.fromEntity(empresa);
     }
 
-    public EmpresaDTO atualizar(Integer id, EmpresaDTO dto) {
-        repository.findById(id.longValue())
-                .orElseThrow(() -> new RuntimeException("Empresa não encontrada com ID: " + id));
-
-        dto.setId(id);
-        Empresa entity = paraEntidade(dto);
-        Empresa atualizada = repository.save(entity);
-        return paraDTO(atualizada);
+    @Transactional
+    public EmpresaResponseDTO criar(EmpresaRequestDTO dto) {
+        Empresa empresa = new Empresa();
+        mapearDtoParaEntidade(dto, empresa);
+        Empresa salva = empresaRepository.save(empresa);
+        return EmpresaResponseDTO.fromEntity(salva);
     }
 
-    public void deletar(Integer id) {
-        if (!repository.existsById(id.longValue())) {
-            throw new RuntimeException("Empresa não encontrada com ID: " + id);
+    @Transactional
+    public EmpresaResponseDTO atualizar(Long id, EmpresaRequestDTO dto) {
+        Empresa empresa = empresaRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Empresa não encontrada com id: " + id));
+        mapearDtoParaEntidade(dto, empresa);
+        Empresa atualizada = empresaRepository.save(empresa);
+        return EmpresaResponseDTO.fromEntity(atualizada);
+    }
+
+    @Transactional
+    public void deletar(Long id) {
+        if (!empresaRepository.existsById(id)) {
+            throw new EntityNotFoundException("Empresa não encontrada com id: " + id);
         }
-        repository.deleteById(id.longValue());
+        empresaRepository.deleteById(id);
     }
 
-    private EmpresaDTO paraDTO(Empresa entity) {
-        EmpresaDTO dto = new EmpresaDTO();
-        if (entity.getId() != null) {
-            dto.setId(entity.getId().intValue());
-        }
-        return dto;
-    }
+    private void mapearDtoParaEntidade(EmpresaRequestDTO dto, Empresa empresa) {
+        empresa.setRazaoSocial(dto.razaoSocial());
+        empresa.setNomeFantasia(dto.nomeFantasia());
 
-    private Empresa paraEntidade(EmpresaDTO dto) {
-        Empresa entity = new Empresa();
-        if (dto.getId() != null) {
-            entity.setId(dto.getId().longValue());
+        if (dto.cnpj() != null) {
+            empresa.setCnpj(dto.cnpj().replaceAll("\\D", ""));
+        } else {
+            empresa.setCnpj(null);
         }
-        return entity;
+
+        empresa.setInscricaoEstadual(dto.inscricaoEstadual());
+        empresa.setPlano(dto.plano());
+        empresa.setLogoUrl(dto.logoUrl());
+        empresa.setAtivo(dto.ativo() != null ? dto.ativo() : true);
     }
 }

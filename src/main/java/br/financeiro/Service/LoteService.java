@@ -1,69 +1,76 @@
-package br.financeiro.Service;
+package br.financeiro.service;
 
-import br.financeiro.DTO.LoteDTO;
+import br.financeiro.DTO.request.LoteRequestDTO;
+import br.financeiro.DTO.response.LoteResponseDTO;
 import br.financeiro.model.Lote;
+import br.financeiro.model.Produto;
 import br.financeiro.repository.LoteRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import br.financeiro.repository.ProdutoRepository;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class LoteService {
 
-    @Autowired
-    private LoteRepository repository;
+    private final LoteRepository loteRepository;
+    private final ProdutoRepository produtoRepository;
 
-    public List<LoteDTO> listarTodos() {
-        return repository.findAll()
-                .stream()
-                .map(this::paraDTO)
-                .collect(Collectors.toList());
+    public LoteService(LoteRepository loteRepository, ProdutoRepository produtoRepository) {
+        this.loteRepository = loteRepository;
+        this.produtoRepository = produtoRepository;
     }
 
-    public LoteDTO buscarPorId(Integer id) {
-        Lote entity = repository.findById(id.longValue())
-                .orElseThrow(() -> new RuntimeException("Lote não encontrado com ID: " + id));
-        return paraDTO(entity);
+    @Transactional(readOnly = true)
+    public List<LoteResponseDTO> listarTodos() {
+        return loteRepository.findAll().stream()
+                .map(LoteResponseDTO::fromEntity)
+                .toList();
     }
 
-    public LoteDTO salvar(LoteDTO dto) {
-        Lote entity = paraEntidade(dto);
-        Lote salva = repository.save(entity);
-        return paraDTO(salva);
+    @Transactional(readOnly = true)
+    public LoteResponseDTO buscarPorId(Long id) {
+        Lote lote = loteRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Lote não encontrado com id: " + id));
+        return LoteResponseDTO.fromEntity(lote);
     }
 
-    public LoteDTO atualizar(Integer id, LoteDTO dto) {
-        repository.findById(id.longValue())
-                .orElseThrow(() -> new RuntimeException("Lote não encontrado com ID: " + id));
-
-        dto.setId(id);
-        Lote entity = paraEntidade(dto);
-        Lote atualizada = repository.save(entity);
-        return paraDTO(atualizada);
+    @Transactional
+    public LoteResponseDTO criar(LoteRequestDTO dto) {
+        Lote lote = new Lote();
+        mapearDtoParaEntidade(dto, lote);
+        Lote salvo = loteRepository.save(lote);
+        return LoteResponseDTO.fromEntity(salvo);
     }
 
-    public void deletar(Integer id) {
-        if (!repository.existsById(id.longValue())) {
-            throw new RuntimeException("Lote não encontrado com ID: " + id);
+    @Transactional
+    public LoteResponseDTO atualizar(Long id, LoteRequestDTO dto) {
+        Lote lote = loteRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Lote não encontrado com id: " + id));
+        mapearDtoParaEntidade(dto, lote);
+        Lote atualizado = loteRepository.save(lote);
+        return LoteResponseDTO.fromEntity(atualizado);
+    }
+
+    @Transactional
+    public void deletar(Long id) {
+        if (!loteRepository.existsById(id)) {
+            throw new EntityNotFoundException("Lote não encontrado com id: " + id);
         }
-        repository.deleteById(id.longValue());
+        loteRepository.deleteById(id);
     }
 
-    private LoteDTO paraDTO(Lote entity) {
-        LoteDTO dto = new LoteDTO();
-        if (entity.getId() != null) {
-            dto.setId(entity.getId().intValue());
+    private void mapearDtoParaEntidade(LoteRequestDTO dto, Lote lote) {
+        if (dto.produtoId() != null) {
+            Produto produto = produtoRepository.findById(dto.produtoId())
+                    .orElseThrow(() -> new EntityNotFoundException("Produto não encontrado com id: " + dto.produtoId()));
+            lote.setProduto(produto);
         }
-        return dto;
-    }
-
-    private Lote paraEntidade(LoteDTO dto) {
-        Lote entity = new Lote();
-        if (dto.getId() != null) {
-            entity.setId(dto.getId().longValue());
-        }
-        return entity;
+        lote.setNumeroLote(dto.numeroLote());
+        lote.setQuantidade(dto.quantidade());
+        lote.setDataValidade(dto.dataValidade());
+        lote.setDataEntrada(dto.dataEntrada());
     }
 }

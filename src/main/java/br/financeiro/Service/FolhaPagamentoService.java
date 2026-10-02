@@ -1,69 +1,88 @@
-package br.financeiro.Service;
+package br.financeiro.service;
 
-import br.financeiro.DTO.FolhaPagamentoDTO;
+import br.financeiro.DTO.request.FolhaPagamentoRequestDTO;
+import br.financeiro.DTO.response.FolhaPagamentoResponseDTO;
+import br.financeiro.model.Empresa;
 import br.financeiro.model.FolhaPagamento;
+import br.financeiro.model.Funcionario;
+import br.financeiro.repository.EmpresaRepository;
 import br.financeiro.repository.FolhaPagamentoRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import br.financeiro.repository.FuncionarioRepository;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class FolhaPagamentoService {
 
-    @Autowired
-    private FolhaPagamentoRepository repository;
+    private final FolhaPagamentoRepository folhaPagamentoRepository;
+    private final EmpresaRepository empresaRepository;
+    private final FuncionarioRepository funcionarioRepository;
 
-    public List<FolhaPagamentoDTO> listarTodas() {
-        return repository.findAll()
-                .stream()
-                .map(this::paraDTO)
-                .collect(Collectors.toList());
+    public FolhaPagamentoService(FolhaPagamentoRepository folhaPagamentoRepository,
+                                 EmpresaRepository empresaRepository,
+                                 FuncionarioRepository funcionarioRepository) {
+        this.folhaPagamentoRepository = folhaPagamentoRepository;
+        this.empresaRepository = empresaRepository;
+        this.funcionarioRepository = funcionarioRepository;
     }
 
-    public FolhaPagamentoDTO buscarPorId(Integer id) {
-        FolhaPagamento entity = repository.findById(id.longValue())
-                .orElseThrow(() -> new RuntimeException("Folha de Pagamento não encontrada com ID: " + id));
-        return paraDTO(entity);
+    @Transactional(readOnly = true)
+    public List<FolhaPagamentoResponseDTO> listarTodas() {
+        return folhaPagamentoRepository.findAll().stream()
+                .map(FolhaPagamentoResponseDTO::fromEntity)
+                .toList();
     }
 
-    public FolhaPagamentoDTO salvar(FolhaPagamentoDTO dto) {
-        FolhaPagamento entity = paraEntidade(dto);
-        FolhaPagamento salva = repository.save(entity);
-        return paraDTO(salva);
+    @Transactional(readOnly = true)
+    public FolhaPagamentoResponseDTO buscarPorId(Long id) {
+        FolhaPagamento folha = folhaPagamentoRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Folha de Pagamento não encontrada com id: " + id));
+        return FolhaPagamentoResponseDTO.fromEntity(folha);
     }
 
-    public FolhaPagamentoDTO atualizar(Integer id, FolhaPagamentoDTO dto) {
-        repository.findById(id.longValue())
-                .orElseThrow(() -> new RuntimeException("Folha de Pagamento não encontrada com ID: " + id));
-
-        dto.setId(id);
-        FolhaPagamento entity = paraEntidade(dto);
-        FolhaPagamento atualizada = repository.save(entity);
-        return paraDTO(atualizada);
+    @Transactional
+    public FolhaPagamentoResponseDTO criar(FolhaPagamentoRequestDTO dto) {
+        FolhaPagamento folha = new FolhaPagamento();
+        mapearDtoParaEntidade(dto, folha);
+        FolhaPagamento salva = folhaPagamentoRepository.save(folha);
+        return FolhaPagamentoResponseDTO.fromEntity(salva);
     }
 
-    public void deletar(Integer id) {
-        if (!repository.existsById(id.longValue())) {
-            throw new RuntimeException("Folha de Pagamento não encontrada com ID: " + id);
+    @Transactional
+    public FolhaPagamentoResponseDTO atualizar(Long id, FolhaPagamentoRequestDTO dto) {
+        FolhaPagamento folha = folhaPagamentoRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Folha de Pagamento não encontrada com id: " + id));
+        mapearDtoParaEntidade(dto, folha);
+        FolhaPagamento atualizada = folhaPagamentoRepository.save(folha);
+        return FolhaPagamentoResponseDTO.fromEntity(atualizada);
+    }
+
+    @Transactional
+    public void deletar(Long id) {
+        if (!folhaPagamentoRepository.existsById(id)) {
+            throw new EntityNotFoundException("Folha de Pagamento não encontrada com id: " + id);
         }
-        repository.deleteById(id.longValue());
+        folhaPagamentoRepository.deleteById(id);
     }
 
-    private FolhaPagamentoDTO paraDTO(FolhaPagamento entity) {
-        FolhaPagamentoDTO dto = new FolhaPagamentoDTO();
-        if (entity.getId() != null) {
-            dto.setId(entity.getId().intValue());
+    private void mapearDtoParaEntidade(FolhaPagamentoRequestDTO dto, FolhaPagamento folha) {
+        if (dto.empresaId() != null) {
+            Empresa empresa = empresaRepository.findById(dto.empresaId())
+                    .orElseThrow(() -> new EntityNotFoundException("Empresa não encontrada com id: " + dto.empresaId()));
+            folha.setEmpresa(empresa);
         }
-        return dto;
-    }
-
-    private FolhaPagamento paraEntidade(FolhaPagamentoDTO dto) {
-        FolhaPagamento entity = new FolhaPagamento();
-        if (dto.getId() != null) {
-            entity.setId(dto.getId().longValue());
+        if (dto.funcionarioId() != null) {
+            Funcionario funcionario = funcionarioRepository.findById(dto.funcionarioId())
+                    .orElseThrow(() -> new EntityNotFoundException("Funcionário não encontrado com id: " + dto.funcionarioId()));
+            folha.setFuncionario(funcionario);
         }
-        return entity;
+        folha.setCompetencia(dto.competencia());
+        folha.setSalarioBruto(dto.salarioBruto());
+        folha.setEncargosSociais(dto.encargosSociais());
+        folha.setDescontos(dto.descontos());
+        folha.setSalarioLiquido(dto.salarioLiquido());
     }
 }

@@ -1,69 +1,122 @@
-package br.financeiro.Service;
+package br.financeiro.service;
 
-import br.financeiro.DTO.ProdutoDTO;
+import br.financeiro.DTO.request.ProdutoRequestDTO;
+import br.financeiro.DTO.response.ProdutoResponseDTO;
+import br.financeiro.model.CategoriaProduto;
+import br.financeiro.model.Empresa;
+import br.financeiro.model.Fornecedor;
+import br.financeiro.model.Funcionario;
 import br.financeiro.model.Produto;
+import br.financeiro.repository.CategoriaProdutoRepository;
+import br.financeiro.repository.EmpresaRepository;
+import br.financeiro.repository.FornecedorRepository;
+import br.financeiro.repository.FuncionarioRepository;
 import br.financeiro.repository.ProdutoRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class ProdutoService {
 
-    @Autowired
-    private ProdutoRepository repository;
+    private final ProdutoRepository produtoRepository;
+    private final EmpresaRepository empresaRepository;
+    private final CategoriaProdutoRepository categoriaProdutoRepository;
+    private final FornecedorRepository fornecedorRepository;
+    private final FuncionarioRepository funcionarioRepository;
 
-    public List<ProdutoDTO> listarTodos() {
-        return repository.findAll()
-                .stream()
-                .map(this::paraDTO)
-                .collect(Collectors.toList());
+    public ProdutoService(ProdutoRepository produtoRepository,
+                          EmpresaRepository empresaRepository,
+                          CategoriaProdutoRepository categoriaProdutoRepository,
+                          FornecedorRepository fornecedorRepository,
+                          FuncionarioRepository funcionarioRepository) {
+        this.produtoRepository = produtoRepository;
+        this.empresaRepository = empresaRepository;
+        this.categoriaProdutoRepository = categoriaProdutoRepository;
+        this.fornecedorRepository = fornecedorRepository;
+        this.funcionarioRepository = funcionarioRepository;
     }
 
-    public ProdutoDTO buscarPorId(Integer id) {
-        Produto entity = repository.findById(id.longValue())
-                .orElseThrow(() -> new RuntimeException("Produto não encontrado com ID: " + id));
-        return paraDTO(entity);
+    @Transactional(readOnly = true)
+    public List<ProdutoResponseDTO> listarTodos() {
+        return produtoRepository.findAll().stream()
+                .map(ProdutoResponseDTO::fromEntity)
+                .toList();
     }
 
-    public ProdutoDTO salvar(ProdutoDTO dto) {
-        Produto entity = paraEntidade(dto);
-        Produto salva = repository.save(entity);
-        return paraDTO(salva);
+    @Transactional(readOnly = true)
+    public ProdutoResponseDTO buscarPorId(Long id) {
+        Produto produto = produtoRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Produto não encontrado com id: " + id));
+        return ProdutoResponseDTO.fromEntity(produto);
     }
 
-    public ProdutoDTO atualizar(Integer id, ProdutoDTO dto) {
-        repository.findById(id.longValue())
-                .orElseThrow(() -> new RuntimeException("Produto não encontrado com ID: " + id));
-
-        dto.setId(id);
-        Produto entity = paraEntidade(dto);
-        Produto atualizada = repository.save(entity);
-        return paraDTO(atualizada);
+    @Transactional
+    public ProdutoResponseDTO criar(ProdutoRequestDTO dto) {
+        Produto produto = new Produto();
+        mapearDtoParaEntidade(dto, produto);
+        Produto salvo = produtoRepository.save(produto);
+        return ProdutoResponseDTO.fromEntity(salvo);
     }
 
-    public void deletar(Integer id) {
-        if (!repository.existsById(id.longValue())) {
-            throw new RuntimeException("Produto não encontrado com ID: " + id);
+    @Transactional
+    public ProdutoResponseDTO atualizar(Long id, ProdutoRequestDTO dto) {
+        Produto produto = produtoRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Produto não encontrado com id: " + id));
+        mapearDtoParaEntidade(dto, produto);
+        Produto atualizado = produtoRepository.save(produto);
+        return ProdutoResponseDTO.fromEntity(atualizado);
+    }
+
+    @Transactional
+    public void deletar(Long id) {
+        if (!produtoRepository.existsById(id)) {
+            throw new EntityNotFoundException("Produto não encontrado com id: " + id);
         }
-        repository.deleteById(id.longValue());
+        produtoRepository.deleteById(id);
     }
 
-    private ProdutoDTO paraDTO(Produto entity) {
-        ProdutoDTO dto = new ProdutoDTO();
-        if (entity.getId() != null) {
-            dto.setId(entity.getId().intValue());
+    private void mapearDtoParaEntidade(ProdutoRequestDTO dto, Produto produto) {
+        if (dto.empresaId() != null) {
+            Empresa empresa = empresaRepository.findById(dto.empresaId())
+                    .orElseThrow(() -> new EntityNotFoundException("Empresa não encontrada com id: " + dto.empresaId()));
+            produto.setEmpresa(empresa);
         }
-        return dto;
-    }
 
-    private Produto paraEntidade(ProdutoDTO dto) {
-        Produto entity = new Produto();
-        if (dto.getId() != null) {
-            entity.setId(dto.getId().longValue());
+        if (dto.categoriaId() != null) {
+            CategoriaProduto categoria = categoriaProdutoRepository.findById(dto.categoriaId())
+                    .orElseThrow(() -> new EntityNotFoundException("Categoria de produto não encontrada com id: " + dto.categoriaId()));
+            produto.setCategoria(categoria);
+        } else {
+            produto.setCategoria(null);
         }
-        return entity;
+
+        if (dto.fornecedorId() != null) {
+            Fornecedor fornecedor = fornecedorRepository.findById(dto.fornecedorId())
+                    .orElseThrow(() -> new EntityNotFoundException("Fornecedor não encontrado com id: " + dto.fornecedorId()));
+            produto.setFornecedor(fornecedor);
+        } else {
+            produto.setFornecedor(null);
+        }
+
+        if (dto.atualizadoPorId() != null) {
+            Funcionario funcionario = funcionarioRepository.findById(dto.atualizadoPorId())
+                    .orElseThrow(() -> new EntityNotFoundException("Funcionário não encontrado com id: " + dto.atualizadoPorId()));
+            produto.setAtualizadoPor(funcionario);
+        } else {
+            produto.setAtualizadoPor(null);
+        }
+
+        produto.setCodigo(dto.codigo());
+        produto.setNome(dto.nome());
+        produto.setControlaLote(dto.controlaLote() != null ? dto.controlaLote() : false);
+        produto.setPreco(dto.preco());
+        produto.setUnidadeMedida(dto.unidadeMedida());
+        produto.setQuantidadeEstoque(dto.quantidadeEstoque() != null ? dto.quantidadeEstoque() : 0);
+        produto.setEstoqueMinimo(dto.estoqueMinimo() != null ? dto.estoqueMinimo() : 0);
+        produto.setStatus(dto.status());
+        produto.setDataUltimaAtualizacao(dto.dataUltimaAtualizacao());
     }
 }

@@ -1,5 +1,6 @@
 package br.financeiro.config;
 
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.validation.FieldError;
@@ -14,26 +15,36 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ProblemDetail handleValidationErrors(MethodArgumentNotValidException ex) {
+    @ExceptionHandler(EntityNotFoundException.class)
+    public ProblemDetail handleEntityNotFound(EntityNotFoundException ex) {
         ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
-                HttpStatus.BAD_REQUEST, "Erro de validação nos campos informados.");
-
-        Map<String, String> invalidFields = new HashMap<>();
-        for (FieldError error : ex.getBindingResult().getFieldErrors()) {
-            invalidFields.put(error.getField(), error.getDefaultMessage());
-        }
-
-        problemDetail.setProperty("invalidFields", invalidFields);
+                HttpStatus.NOT_FOUND, ex.getMessage());
         problemDetail.setProperty("timestamp", Instant.now());
         return problemDetail;
     }
 
-    @ExceptionHandler(RuntimeException.class)
-    public ProblemDetail handleRuntimeException(RuntimeException ex) {
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ProblemDetail handleValidationExceptions(MethodArgumentNotValidException ex) {
+        Map<String, String> errors = new HashMap<>();
+        ex.getBindingResult().getAllErrors().forEach(error -> {
+            String fieldName = ((FieldError) error).getField();
+            String errorMessage = error.getDefaultMessage();
+            errors.put(fieldName, errorMessage);
+        });
+
         ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
-                HttpStatus.BAD_REQUEST, ex.getMessage());
+                HttpStatus.BAD_REQUEST, "Falha na validação dos campos da requisição.");
         problemDetail.setProperty("timestamp", Instant.now());
+        problemDetail.setProperty("erros", errors);
+        return problemDetail;
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ProblemDetail handleGenericException(Exception ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
+                HttpStatus.INTERNAL_SERVER_ERROR, "Ocorreu um erro interno no servidor.");
+        problemDetail.setProperty("timestamp", Instant.now());
+        problemDetail.setProperty("mensagem", ex.getMessage());
         return problemDetail;
     }
 }

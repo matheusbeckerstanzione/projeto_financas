@@ -11,25 +11,25 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 public record ItemFinanceiroRequestDTO(
-        @NotNull(message = "O ID da empresa é obrigatório")
-        Long empresaId,
+    @NotNull(message = "O ID da empresa é obrigatório")
+    Long empresaId,
 
-        Long movimentacaoEstoqueId,
+    Long movimentacaoEstoqueId,
 
-        @NotBlank(message = "A descrição é obrigatória")
-        @Size(max = 255, message = "A descrição deve ter no máximo 255 caracteres")
-        String descricao,
+    @NotBlank(message = "A descrição é obrigatória")
+    @Size(max = 255, message = "A descrição deve ter no máximo 255 caracteres")
+    String descricao,
 
-        @NotNull(message = "A categoria é obrigatória")
-        ItemFinanceiroCategoria categoria,
+    @NotNull(message = "A categoria é obrigatória")
+    ItemFinanceiroCategoria categoria,
 
-        @NotNull(message = "O valor é obrigatório")
-        @DecimalMin(value = "0.01", message = "O valor deve ser maior que zero")
-        BigDecimal valor,
+    @NotNull(message = "O valor é obrigatório")
+    @DecimalMin(value = "0.01", message = "O valor deve ser maior que zero")
+    BigDecimal valor,
 
-        @NotNull(message = "O status de pagamento é obrigatório")
-        StatusPagamento status,
+    @NotNull(message = "O status de pagamento é obrigatório")
+    StatusPagamento status,
 
-        @NotNull(message = "A data de vencimento é obrigatória")
-        LocalDate dataVencimento
+    @NotNull(message = "A data de vencimento é obrigatória")
+    LocalDate dataVencimento
 ) {}

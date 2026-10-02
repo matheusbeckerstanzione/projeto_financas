@@ -1,69 +1,74 @@
-package br.financeiro.Service;
+package br.financeiro.service;
 
-import br.financeiro.DTO.BeneficioDTO;
+import br.financeiro.DTO.request.BeneficioRequestDTO;
+import br.financeiro.DTO.response.BeneficioResponseDTO;
 import br.financeiro.model.Beneficio;
+import br.financeiro.model.Empresa;
 import br.financeiro.repository.BeneficioRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import br.financeiro.repository.EmpresaRepository;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class BeneficioService {
 
-    @Autowired
-    private BeneficioRepository repository;
+    private final BeneficioRepository beneficioRepository;
+    private final EmpresaRepository empresaRepository;
 
-    public List<BeneficioDTO> listarBeneficios() {
-        return repository.findAll()
-                .stream()
-                .map(this::paraDTO)
-                .collect(Collectors.toList());
+    public BeneficioService(BeneficioRepository beneficioRepository, EmpresaRepository empresaRepository) {
+        this.beneficioRepository = beneficioRepository;
+        this.empresaRepository = empresaRepository;
     }
 
-    public BeneficioDTO buscarBeneficioPorId(Integer id) {
-        Beneficio entity = repository.findById(id.longValue())
-                .orElseThrow(() -> new RuntimeException("Benefício não encontrado com ID: " + id));
-        return paraDTO(entity);
+    @Transactional(readOnly = true)
+    public List<BeneficioResponseDTO> listarTodos() {
+        return beneficioRepository.findAll().stream()
+                .map(BeneficioResponseDTO::fromEntity)
+                .toList();
     }
 
-    public BeneficioDTO salvarBeneficio(BeneficioDTO dto) {
-        Beneficio entity = paraEntidade(dto);
-        Beneficio salva = repository.save(entity);
-        return paraDTO(salva);
+    @Transactional(readOnly = true)
+    public BeneficioResponseDTO buscarPorId(Long id) {
+        Beneficio beneficio = beneficioRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Benefício não encontrado com id: " + id));
+        return BeneficioResponseDTO.fromEntity(beneficio);
     }
 
-    public BeneficioDTO atualizarBeneficio(Integer id, BeneficioDTO dto) {
-        repository.findById(id.longValue())
-                .orElseThrow(() -> new RuntimeException("Benefício não encontrado com ID: " + id));
-        
-        dto.setId(id);
-        Beneficio entity = paraEntidade(dto);
-        Beneficio atualizada = repository.save(entity);
-        return paraDTO(atualizada);
+    @Transactional
+    public BeneficioResponseDTO criar(BeneficioRequestDTO dto) {
+        Beneficio beneficio = new Beneficio();
+        mapearDtoParaEntidade(dto, beneficio);
+        Beneficio salvo = beneficioRepository.save(beneficio);
+        return BeneficioResponseDTO.fromEntity(salvo);
     }
 
-    public void deletarBeneficio(Integer id) {
-        if (!repository.existsById(id.longValue())) {
-            throw new RuntimeException("Benefício não encontrado com ID: " + id);
+    @Transactional
+    public BeneficioResponseDTO atualizar(Long id, BeneficioRequestDTO dto) {
+        Beneficio beneficio = beneficioRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Benefício não encontrado com id: " + id));
+        mapearDtoParaEntidade(dto, beneficio);
+        Beneficio atualizado = beneficioRepository.save(beneficio);
+        return BeneficioResponseDTO.fromEntity(atualizado);
+    }
+
+    @Transactional
+    public void deletar(Long id) {
+        if (!beneficioRepository.existsById(id)) {
+            throw new EntityNotFoundException("Benefício não encontrado com id: " + id);
         }
-        repository.deleteById(id.longValue());
+        beneficioRepository.deleteById(id);
     }
 
-    private BeneficioDTO paraDTO(Beneficio entity) {
-        BeneficioDTO dto = new BeneficioDTO();
-        if (entity.getId() != null) {
-            dto.setId(entity.getId().intValue());
+    private void mapearDtoParaEntidade(BeneficioRequestDTO dto, Beneficio beneficio) {
+        if (dto.empresaId() != null) {
+            Empresa empresa = empresaRepository.findById(dto.empresaId())
+                    .orElseThrow(() -> new EntityNotFoundException("Empresa não encontrada com id: " + dto.empresaId()));
+            beneficio.setEmpresa(empresa);
         }
-        return dto;
-    }
-
-    private Beneficio paraEntidade(BeneficioDTO dto) {
-        Beneficio entity = new Beneficio();
-        if (dto.getId() != null) {
-            entity.setId(dto.getId().longValue());
-        }
-        return entity;
+        beneficio.setTipo(dto.tipo());
+        beneficio.setCustoMensal(dto.custoMensal());
     }
 }

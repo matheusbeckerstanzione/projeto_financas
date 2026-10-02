@@ -1,67 +1,93 @@
-package br.financeiro.Service;
+package br.financeiro.service;
 
-import br.financeiro.DTO.UsuarioModuloDTO;
+import br.financeiro.DTO.request.UsuarioModuloRequestDTO;
+import br.financeiro.DTO.response.UsuarioModuloResponseDTO;
+import br.financeiro.model.Modulo;
+import br.financeiro.model.Usuario;
 import br.financeiro.model.UsuarioModulo;
+import br.financeiro.model.UsuarioModuloId;
+import br.financeiro.repository.ModuloRepository;
 import br.financeiro.repository.UsuarioModuloRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import br.financeiro.repository.UsuarioRepository;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class UsuarioModuloService {
 
-    @Autowired
-    private UsuarioModuloRepository repository;
+    private final UsuarioModuloRepository usuarioModuloRepository;
+    private final UsuarioRepository usuarioRepository;
+    private final ModuloRepository moduloRepository;
 
-    public List<UsuarioModuloDTO> listarTodos() {
-        return repository.findAll()
-                .stream()
-                .map(this::paraDTO)
-                .collect(Collectors.toList());
+    public UsuarioModuloService(UsuarioModuloRepository usuarioModuloRepository,
+                                UsuarioRepository usuarioRepository,
+                                ModuloRepository moduloRepository) {
+        this.usuarioModuloRepository = usuarioModuloRepository;
+        this.usuarioRepository = usuarioRepository;
+        this.moduloRepository = moduloRepository;
     }
 
-    public UsuarioModuloDTO buscarPorIds(Integer usuarioId, Integer moduloId) {
-        return repository.findAll()
-                .stream()
-                .filter(um -> um.getUsuario() != null && um.getUsuario().getId().equals(usuarioId.longValue()) &&
-                              um.getModulo() != null && um.getModulo().getId().equals(moduloId.longValue()))
-                .findFirst()
-                .map(this::paraDTO)
-                .orElseThrow(() -> new RuntimeException("Associação UsuarioModulo não encontrada."));
+    @Transactional(readOnly = true)
+    public List<UsuarioModuloResponseDTO> listarTodos() {
+        return usuarioModuloRepository.findAll().stream()
+                .map(UsuarioModuloResponseDTO::fromEntity)
+                .toList();
     }
 
-    public UsuarioModuloDTO salvar(UsuarioModuloDTO dto) {
-        UsuarioModulo entity = paraEntidade(dto);
-        UsuarioModulo salva = repository.save(entity);
-        return paraDTO(salva);
+    @Transactional(readOnly = true)
+    public UsuarioModuloResponseDTO buscarPorId(Long usuarioId, Long moduloId) {
+        UsuarioModuloId id = new UsuarioModuloId(usuarioId, moduloId);
+        UsuarioModulo usuarioModulo = usuarioModuloRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Associação Usuário-Módulo não encontrada para os IDs: " + usuarioId + ", " + moduloId));
+        return UsuarioModuloResponseDTO.fromEntity(usuarioModulo);
     }
 
-    public void deletar(Integer usuarioId, Integer moduloId) {
-        UsuarioModulo existente = repository.findAll()
-                .stream()
-                .filter(um -> um.getUsuario() != null && um.getUsuario().getId().equals(usuarioId.longValue()) &&
-                              um.getModulo() != null && um.getModulo().getId().equals(moduloId.longValue()))
-                .findFirst()
-                .orElseThrow(() -> new RuntimeException("Associação UsuarioModulo não encontrada para remoção."));
-
-        repository.delete(existente);
+    @Transactional
+    public UsuarioModuloResponseDTO criar(UsuarioModuloRequestDTO dto) {
+        UsuarioModulo usuarioModulo = new UsuarioModulo();
+        mapearDtoParaEntidade(dto, usuarioModulo);
+        UsuarioModulo salvo = usuarioModuloRepository.save(usuarioModulo);
+        return UsuarioModuloResponseDTO.fromEntity(salvo);
     }
 
-    private UsuarioModuloDTO paraDTO(UsuarioModulo entity) {
-        UsuarioModuloDTO dto = new UsuarioModuloDTO();
-        if (entity.getUsuario() != null && entity.getUsuario().getId() != null) {
-            dto.setUsuarioId(entity.getUsuario().getId().intValue());
+    @Transactional
+    public UsuarioModuloResponseDTO atualizar(Long usuarioId, Long moduloId, UsuarioModuloRequestDTO dto) {
+        UsuarioModuloId id = new UsuarioModuloId(usuarioId, moduloId);
+        UsuarioModulo usuarioModulo = usuarioModuloRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Associação Usuário-Módulo não encontrada para os IDs: " + usuarioId + ", " + moduloId));
+        mapearDtoParaEntidade(dto, usuarioModulo);
+        UsuarioModulo atualizado = usuarioModuloRepository.save(usuarioModulo);
+        return UsuarioModuloResponseDTO.fromEntity(atualizado);
+    }
+
+    @Transactional
+    public void deletar(Long usuarioId, Long moduloId) {
+        UsuarioModuloId id = new UsuarioModuloId(usuarioId, moduloId);
+        if (!usuarioModuloRepository.existsById(id)) {
+            throw new EntityNotFoundException("Associação Usuário-Módulo não encontrada para os IDs: " + usuarioId + ", " + moduloId);
         }
-        if (entity.getModulo() != null && entity.getModulo().getId() != null) {
-            dto.setModuloId(entity.getModulo().getId().intValue());
-        }
-        return dto;
+        usuarioModuloRepository.deleteById(id);
     }
 
-    private UsuarioModulo paraEntidade(UsuarioModuloDTO dto) {
-        UsuarioModulo entity = new UsuarioModulo();
-        return entity;
+    private void mapearDtoParaEntidade(UsuarioModuloRequestDTO dto, UsuarioModulo usuarioModulo) {
+        UsuarioModuloId id = new UsuarioModuloId(dto.usuarioId(), dto.moduloId());
+        usuarioModulo.setId(id);
+
+        if (dto.usuarioId() != null) {
+            Usuario usuario = usuarioRepository.findById(dto.usuarioId())
+                    .orElseThrow(() -> new EntityNotFoundException("Usuário não encontrado com id: " + dto.usuarioId()));
+            usuarioModulo.setUsuario(usuario);
+        }
+
+        if (dto.moduloId() != null) {
+            Modulo modulo = moduloRepository.findById(dto.moduloId())
+                    .orElseThrow(() -> new EntityNotFoundException("Módulo não encontrado com id: " + dto.moduloId()));
+            usuarioModulo.setModulo(modulo);
+        }
+
+        usuarioModulo.setNivel(dto.nivel());
     }
 }

@@ -1,44 +1,49 @@
-package br.financeiro.Controller;
+package br.financeiro.controller;
 
-import br.financeiro.DTO.EmpresaDTO;
-import br.financeiro.Service.EmpresaService;
-import org.springframework.beans.factory.annotation.Autowired;
+import br.financeiro.DTO.request.EmpresaRequestDTO;
+import br.financeiro.DTO.response.EmpresaResponseDTO;
+import br.financeiro.service.EmpresaService;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("/empresas")
-@CrossOrigin("*")
+@RequestMapping("/api/empresas")
 public class EmpresaController {
 
-    @Autowired
-    private EmpresaService service;
+    private final EmpresaService empresaService;
+
+    public EmpresaController(EmpresaService empresaService) {
+        this.empresaService = empresaService;
+    }
 
     @GetMapping
-    public ResponseEntity<List<EmpresaDTO>> listarTodas() {
-        return ResponseEntity.ok(service.listarTodas());
+    public ResponseEntity<List<EmpresaResponseDTO>> listarTodos() {
+        return ResponseEntity.ok(empresaService.listarTodos());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<EmpresaDTO> buscarPorId(@PathVariable Integer id) {
-        return ResponseEntity.ok(service.buscarPorId(id));
+    public ResponseEntity<EmpresaResponseDTO> buscarPorId(@PathVariable Long id) {
+        return ResponseEntity.ok(empresaService.buscarPorId(id));
     }
 
     @PostMapping
-    public ResponseEntity<EmpresaDTO> criar(@RequestBody EmpresaDTO dto) {
-        return ResponseEntity.ok(service.salvar(dto));
+    public ResponseEntity<EmpresaResponseDTO> criar(@Valid @RequestBody EmpresaRequestDTO requestDTO) {
+        EmpresaResponseDTO criado = empresaService.criar(requestDTO);
+        return ResponseEntity.status(HttpStatus.CREATED).body(criado);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<EmpresaDTO> atualizar(@PathVariable Integer id, @RequestBody EmpresaDTO dto) {
-        return ResponseEntity.ok(service.atualizar(id, dto));
+    public ResponseEntity<EmpresaResponseDTO> atualizar(@PathVariable Long id, @Valid @RequestBody EmpresaRequestDTO requestDTO) {
+        return ResponseEntity.ok(empresaService.atualizar(id, requestDTO));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deletar(@PathVariable Integer id) {
-        service.deletar(id);
+    public ResponseEntity<Void> deletar(@PathVariable Long id) {
+        empresaService.deletar(id);
         return ResponseEntity.noContent().build();
     }
 }

@@ -1,99 +1,100 @@
-package br.financeiro.Service;
+package br.financeiro.service;
 
-import br.financeiro.DTO.UsuarioDTO;
+import br.financeiro.DTO.request.UsuarioRequestDTO;
+import br.financeiro.DTO.response.UsuarioResponseDTO;
+import br.financeiro.model.Empresa;
+import br.financeiro.model.Funcionario;
 import br.financeiro.model.Usuario;
+import br.financeiro.repository.EmpresaRepository;
+import br.financeiro.repository.FuncionarioRepository;
 import br.financeiro.repository.UsuarioRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.persistence.EntityNotFoundException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class UsuarioService {
 
-    @Autowired
-    private UsuarioRepository repository;
+    private final UsuarioRepository usuarioRepository;
+    private final EmpresaRepository empresaRepository;
+    private final FuncionarioRepository funcionarioRepository;
+    private final PasswordEncoder passwordEncoder;
 
-    public List<UsuarioDTO> listarTodos() {
-        return repository.findAll()
-                .stream()
-                .map(this::paraDTO)
-                .collect(Collectors.toList());
+    public UsuarioService(UsuarioRepository usuarioRepository,
+                          EmpresaRepository empresaRepository,
+                          FuncionarioRepository funcionarioRepository,
+                          PasswordEncoder passwordEncoder) {
+        this.usuarioRepository = usuarioRepository;
+        this.empresaRepository = empresaRepository;
+        this.funcionarioRepository = funcionarioRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
-    public UsuarioDTO buscarPorId(Integer id) {
-        Usuario entity = repository.findById(id.longValue())
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado com ID: " + id));
-        return paraDTO(entity);
+    @Transactional(readOnly = true)
+    public List<UsuarioResponseDTO> listarTodos() {
+        return usuarioRepository.findAll().stream()
+                .map(UsuarioResponseDTO::fromEntity)
+                .toList();
     }
 
-    public UsuarioDTO salvar(UsuarioDTO dto) {
-        Usuario entity = paraEntidade(dto);
-        Usuario salva = repository.save(entity);
-        return paraDTO(salva);
+    @Transactional(readOnly = true)
+    public UsuarioResponseDTO buscarPorId(Long id) {
+        Usuario usuario = usuarioRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Usuário não encontrado com id: " + id));
+        return UsuarioResponseDTO.fromEntity(usuario);
     }
 
-    public UsuarioDTO atualizar(Integer id, UsuarioDTO dto) {
-        repository.findById(id.longValue())
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado com ID: " + id));
-
-        dto.setId(id);
-        Usuario entity = paraEntidade(dto);
-        Usuario atualizada = repository.save(entity);
-        return paraDTO(atualizada);
+    @Transactional
+    public UsuarioResponseDTO criar(UsuarioRequestDTO dto) {
+        Usuario usuario = new Usuario();
+        mapearDtoParaEntidade(dto, usuario);
+        Usuario salvo = usuarioRepository.save(usuario);
+        return UsuarioResponseDTO.fromEntity(salvo);
     }
 
-    public void deletar(Integer id) {
-        if (!repository.existsById(id.longValue())) {
-            throw new RuntimeException("Usuário não encontrado com ID: " + id);
-        }
-        repository.deleteById(id.longValue());
+    @Transactional
+    public UsuarioResponseDTO atualizar(Long id, UsuarioRequestDTO dto) {
+        Usuario usuario = usuarioRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Usuário não encontrado com id: " + id));
+        mapearDtoParaEntidade(dto, usuario);
+        Usuario atualizado = usuarioRepository.save(usuario);
+        return UsuarioResponseDTO.fromEntity(atualizado);
     }
 
-    private UsuarioDTO paraDTO(Usuario entity) {
-        UsuarioDTO dto = new UsuarioDTO();
-        if (entity.getId() != null) {
-            dto.setId(entity.getId().intValue());
+    @Transactional
+    public void deletar(Long id) {
+        if (!usuarioRepository.existsById(id)) {
+            throw new EntityNotFoundException("Usuário não encontrado com id: " + id);
         }
-        dto.setNome(entity.getNome());
-        dto.setEmail(entity.getEmail());
-        dto.setAtivo(entity.getAtivo());
-
-        if (entity.getIsAdmin() != null) {
-            dto.setAdmin(entity.getIsAdmin());
-        }
-
-        if (entity.getEmpresa() != null && entity.getEmpresa().getId() != null) {
-            dto.setEmpresaId(entity.getEmpresa().getId().intValue());
-        }
-
-        if (entity.getFuncionario() != null && entity.getFuncionario().getId() != null) {
-            dto.setFuncionarioId(entity.getFuncionario().getId().intValue());
-        }
-
-        return dto;
+        usuarioRepository.deleteById(id);
     }
 
-    private Usuario paraEntidade(UsuarioDTO dto) {
-        Usuario entity = new Usuario();
-        if (dto.getId() != null) {
-            entity.setId(dto.getId().longValue());
-        }
-        entity.setNome(dto.getNome());
-        entity.setEmail(dto.getEmail());
-        
-        if (dto.getSenha() != null) {
-            entity.setSenhaHash(dto.getSenha());
-        }
-        
-        if (dto.getAdmin() != null) {
-            entity.setIsAdmin(dto.getAdmin());
-        }
-        if (dto.getAtivo() != null) {
-            entity.setAtivo(dto.getAtivo());
+    private void mapearDtoParaEntidade(UsuarioRequestDTO dto, Usuario usuario) {
+        if (dto.empresaId() != null) {
+            Empresa empresa = empresaRepository.findById(dto.empresaId())
+                    .orElseThrow(() -> new EntityNotFoundException("Empresa não encontrada com id: " + dto.empresaId()));
+            usuario.setEmpresa(empresa);
         }
 
-        return entity;
+        if (dto.funcionarioId() != null) {
+            Funcionario funcionario = funcionarioRepository.findById(dto.funcionarioId())
+                    .orElseThrow(() -> new EntityNotFoundException("Funcionário não encontrado com id: " + dto.funcionarioId()));
+            usuario.setFuncionario(funcionario);
+        } else {
+            usuario.setFuncionario(null);
+        }
+
+        usuario.setNome(dto.nome());
+        usuario.setEmail(dto.email());
+
+        if (dto.senha() != null && !dto.senha().isBlank()) {
+            usuario.setSenhaHash(passwordEncoder.encode(dto.senha()));
+        }
+
+        usuario.setIsAdmin(dto.isAdmin() != null ? dto.isAdmin() : false);
+        usuario.setAtivo(dto.ativo() != null ? dto.ativo() : true);
     }
 }

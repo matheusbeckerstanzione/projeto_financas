@@ -1,69 +1,65 @@
-package br.financeiro.Service;
+package br.financeiro.service;
 
-import br.financeiro.DTO.ModuloDTO;
+import br.financeiro.DTO.request.ModuloRequestDTO;
+import br.financeiro.DTO.response.ModuloResponseDTO;
 import br.financeiro.model.Modulo;
 import br.financeiro.repository.ModuloRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class ModuloService {
 
-    @Autowired
-    private ModuloRepository repository;
+    private final ModuloRepository moduloRepository;
 
-    public List<ModuloDTO> listarTodos() {
-        return repository.findAll()
-                .stream()
-                .map(this::paraDTO)
-                .collect(Collectors.toList());
+    public ModuloService(ModuloRepository moduloRepository) {
+        this.moduloRepository = moduloRepository;
     }
 
-    public ModuloDTO buscarPorId(Integer id) {
-        Modulo entity = repository.findById(id.longValue())
-                .orElseThrow(() -> new RuntimeException("Módulo não encontrado com ID: " + id));
-        return paraDTO(entity);
+    @Transactional(readOnly = true)
+    public List<ModuloResponseDTO> listarTodos() {
+        return moduloRepository.findAll().stream()
+                .map(ModuloResponseDTO::fromEntity)
+                .toList();
     }
 
-    public ModuloDTO salvar(ModuloDTO dto) {
-        Modulo entity = paraEntidade(dto);
-        Modulo salva = repository.save(entity);
-        return paraDTO(salva);
+    @Transactional(readOnly = true)
+    public ModuloResponseDTO buscarPorId(Long id) {
+        Modulo modulo = moduloRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Módulo não encontrado com id: " + id));
+        return ModuloResponseDTO.fromEntity(modulo);
     }
 
-    public ModuloDTO atualizar(Integer id, ModuloDTO dto) {
-        repository.findById(id.longValue())
-                .orElseThrow(() -> new RuntimeException("Módulo não encontrado com ID: " + id));
-
-        dto.setId(id);
-        Modulo entity = paraEntidade(dto);
-        Modulo atualizada = repository.save(entity);
-        return paraDTO(atualizada);
+    @Transactional
+    public ModuloResponseDTO criar(ModuloRequestDTO dto) {
+        Modulo modulo = new Modulo();
+        mapearDtoParaEntidade(dto, modulo);
+        Modulo salvo = moduloRepository.save(modulo);
+        return ModuloResponseDTO.fromEntity(salvo);
     }
 
-    public void deletar(Integer id) {
-        if (!repository.existsById(id.longValue())) {
-            throw new RuntimeException("Módulo não encontrado com ID: " + id);
+    @Transactional
+    public ModuloResponseDTO atualizar(Long id, ModuloRequestDTO dto) {
+        Modulo modulo = moduloRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Módulo não encontrado com id: " + id));
+        mapearDtoParaEntidade(dto, modulo);
+        Modulo atualizado = moduloRepository.save(modulo);
+        return ModuloResponseDTO.fromEntity(atualizado);
+    }
+
+    @Transactional
+    public void deletar(Long id) {
+        if (!moduloRepository.existsById(id)) {
+            throw new EntityNotFoundException("Módulo não encontrado com id: " + id);
         }
-        repository.deleteById(id.longValue());
+        moduloRepository.deleteById(id);
     }
 
-    private ModuloDTO paraDTO(Modulo entity) {
-        ModuloDTO dto = new ModuloDTO();
-        if (entity.getId() != null) {
-            dto.setId(entity.getId().intValue());
-        }
-        return dto;
-    }
-
-    private Modulo paraEntidade(ModuloDTO dto) {
-        Modulo entity = new Modulo();
-        if (dto.getId() != null) {
-            entity.setId(dto.getId().longValue());
-        }
-        return entity;
+    private void mapearDtoParaEntidade(ModuloRequestDTO dto, Modulo modulo) {
+        modulo.setNome(dto.nome());
+        modulo.setChave(dto.chave());
     }
 }
